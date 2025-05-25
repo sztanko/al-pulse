@@ -1,0 +1,5 @@
+# This file was automatically generated
+name: al_pulse
+type: duckdb
+options:
+  filename: al_pulse.duckdb

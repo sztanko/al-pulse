@@ -45,7 +45,7 @@ def main(
             existing_postcodes.update({row[0] for row in reader if row})
 
     conn = duckdb.connect(db_path)
-    result = list(conn.execute("SELECT postal_code FROM invalid_postcodes").fetchall())
+    result = list(conn.execute("SELECT distinct postal_code FROM invalid_postcodes").fetchall())
     conn.close()
     if not result:
         log.info("No invalid postcodes found in the database.")
@@ -61,7 +61,7 @@ def main(
             "municipality",
             "locality",
             "lat",
-            "lon",
+            "lng",
         ],
     )
     ensure_csv_headers(invalid_csv, ["postal_code"])
@@ -87,7 +87,7 @@ def main(
                         data["municipality"],
                         data["locality"],
                         data["lat"],
-                        data["lon"],
+                        data["lng"],
                     ]
                 )
                 log.info(f"Valid: {postcode}")

@@ -8,3 +8,4 @@ sqlfluff-templater-dbt==3.4.0
 tenacity==9.1.2
 black==25.1.0
 beautifulsoup4==4.13.4
+shandy-sqlfmt==0.26.0

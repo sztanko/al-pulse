@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: al_list
+  - name: stg_al_list
     description: >
       Cleaned and renamed Alojamento Local data with English column names.
     columns:
@@ -57,3 +57,12 @@ models:
         description: "Mobile number"
       - name: contact_email
         description: "Email address"
+  - name: stg_postal_codes_raw
+    description: >
+      Cleaned and renamed postal code data with English column names.    
+  - name: stg_postal_codes_invalid
+    description: >
+      Contains invalid postal codes with English column names.
+  - name: stg_postal_code_lookup
+    description: >
+      Contains postal code lookups with English column names.

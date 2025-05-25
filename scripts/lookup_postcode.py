@@ -62,9 +62,9 @@ def lookup_postcode(postcode: str) -> Optional[Dict[str, str]]:
                 lat, lon = map(str.strip, result)
             else:
                 log.warning(f"GPS format is incorrect: {gps_elem.text}")
-                lat, lon = None, None
+                lat, lng = None, None
         else:
-            lat, lon = None, None
+            lat, lng = None, None
 
         if local_elem:
             locality_info = local_elem.text.strip().split(',')
@@ -82,7 +82,7 @@ def lookup_postcode(postcode: str) -> Optional[Dict[str, str]]:
             "municipality": municipality,
             "locality": locality,
             "lat": lat,
-            "lon": lon,
+            "lng": lng,
         }
 
     except Exception as e:

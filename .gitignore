@@ -6,3 +6,4 @@ logs/
 node_modules/
 downloads/al/*.csv
 data/prod.duckdb
+__pycache__

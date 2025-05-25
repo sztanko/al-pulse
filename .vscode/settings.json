@@ -1,16 +1,18 @@
 {
-    "editor.acceptSuggestionOnEnter": true,
     "editor.quickSuggestions": {
         "other": false,
         "comments": false,
         "strings": false
     },
+    "sqlfluff.linter.run": "onSave",
     "sqlfluff.experimental.format.executeInTerminal": true,
+    "editor.formatOnSave": false,
     "editor.quickSuggestionsDelay": 300,
     "terminal.integrated.env.osx": {
         "DBT_PROFILES_DIR": "${workspaceFolder}/config",
     },
     "terminal.integrated.env.linux": {
         "DBT_PROFILES_DIR": "${workspaceFolder}/config",
-    }
+    },
+    "editor.acceptSuggestionOnEnter": true
 }

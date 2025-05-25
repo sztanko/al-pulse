@@ -1,5 +1,3 @@
--- models/staging/stg_address_data.sql
-
 WITH source_data AS (
 
     SELECT
@@ -30,8 +28,8 @@ WITH source_data AS (
         trim(cp7) AS cp7,
         trim(codigopostal) AS full_postal_code,
 
-        cast(long AS double) AS longitude,
-        cast(lat AS double) AS latitude
+        cast(long AS double) AS lng,
+        cast(lat AS double) AS lat
 
     FROM {{ source('raw', 'postal_codes_raw') }}
 

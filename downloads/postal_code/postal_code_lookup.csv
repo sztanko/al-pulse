@@ -1,4 +1,4 @@
-postcode,title,query_postcode,district,municipality,locality,lat,lon
+postcode,title,query_postcode,district,municipality,locality,lat,lng
 8600-128,Montes da Luz,8600-128,Faro,Lagos,Luz,37.092525,-8.730566
 8125-430,Largo da Aldeia Velha,8125-430,Faro,Loulé,Quarteira,37.071403,-8.091934
 8135-854,Estrada Vale de Lobo,8135-854,Faro,Loulé,Almancil,37.052183,-8.056321
