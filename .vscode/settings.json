@@ -1,0 +1,16 @@
+{
+    "editor.acceptSuggestionOnEnter": true,
+    "editor.quickSuggestions": {
+        "other": false,
+        "comments": false,
+        "strings": false
+    },
+    "sqlfluff.experimental.format.executeInTerminal": true,
+    "editor.quickSuggestionsDelay": 300,
+    "terminal.integrated.env.osx": {
+        "DBT_PROFILES_DIR": "${workspaceFolder}/config",
+    },
+    "terminal.integrated.env.linux": {
+        "DBT_PROFILES_DIR": "${workspaceFolder}/config",
+    }
+}

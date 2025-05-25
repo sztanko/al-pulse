@@ -1,0 +1,11 @@
+version: 2
+sources:
+  - name: raw_data
+    schema: main
+    description: |
+      This source contains the staging data for various entities.
+    tables:
+      - name: al_raw_data
+        description: |
+          Contains raw data on AL
+        

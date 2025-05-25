@@ -1,0 +1,7 @@
+al_pulse:
+  outputs:
+    prod:
+      type: duckdb
+      path: data/test.duckdb
+      threads: 4
+  target: prod

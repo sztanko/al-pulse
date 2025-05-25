@@ -1,0 +1,21 @@
+[sqlfluff]
+dialect = duckdb
+templater = dbt
+max_line_length = 160
+exclude_rules = L034, structure.using, RF04, references.qualification, RF01, AL03, AM06
+large_file_skip_byte_limit = 0
+
+[sqlfluff:indentation]
+tab_space_size = 4
+indent_unit = space
+
+[sqlfluff:layout:type:comma]
+line_position = trailing
+
+[sqlfluff:rules]
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower

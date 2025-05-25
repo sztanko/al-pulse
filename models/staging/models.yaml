@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: al_list
+    description: >
+      Cleaned and renamed Alojamento Local data with English column names.
+    columns:
+      - name: registration_number
+        description: "Registration number of the accommodation"
+      - name: registration_date
+        description: "Date of official registration"
+      - name: accommodation_name
+        description: "Name of the accommodation"
+      - name: post_1951_building
+        description: "Indicates if the building was constructed after 1951"
+      - name: public_opening_date
+        description: "Date the accommodation opened to the public"
+      - name: modality
+        description: "Modality or type of accommodation"
+      - name: num_beds
+        description: "Number of beds"
+      - name: num_guests
+        description: "Number of guests"
+      - name: num_rooms
+        description: "Number of rooms"
+      - name: num_bunk_beds
+        description: "Number of bunk beds"
+      - name: address
+        description: "Full address"
+      - name: postal_code
+        description: "Postal code"
+      - name: locality
+        description: "Locality"
+      - name: parish
+        description: "Freguesia (parish)"
+      - name: municipality
+        description: "Concelho (municipality)"
+      - name: district
+        description: "District"
+      - name: nutt_ii
+        description: "NUTT II region"
+      - name: owner_name
+        description: "Name of the owner"
+      - name: owner_quality
+        description: "Owner quality or role"
+      - name: owner_nif
+        description: "NIF of the owner"
+      - name: owner_type
+        description: "Type of owner (individual/company)"
+      - name: owner_country
+        description: "Country of the owner"
+      - name: contact_phone
+        description: "Phone number"
+      - name: contact_fax
+        description: "Fax number"
+      - name: contact_mobile
+        description: "Mobile number"
+      - name: contact_email
+        description: "Email address"
