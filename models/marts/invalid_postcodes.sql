@@ -1,9 +1,12 @@
-SELECT distinct postal_code FROM {{ ref('al_list') }} AS al
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM {{ ref('postcodes') }} AS p
-    WHERE p.cp7 = al.postal_code
+SELECT DISTINCT al.postal_code FROM {{ ref('al_list') }} AS al
+WHERE
+    NOT EXISTS (
+        SELECT 1
+        FROM {{ ref('postcodes') }} AS p
+        WHERE p.cp7 = al.postal_code
     -- postcode should be in the format '1234-567'    
-)
-and al.postal_code ~ '^\d{4}-\d{3}$'
-    and al.postal_code is not null
+    )
+    AND al.postal_code ~ '^\d{4}-\d{3}$'
+    AND al.postal_code IS NOT null
+    -- doesn't end with 000
+    AND al.postal_code !~ '000$'
