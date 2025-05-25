@@ -1,6 +1,6 @@
 version: 2
 sources:
-  - name: raw_data
+  - name: raw
     schema: main
     description: |
       This source contains the staging data for various entities.
@@ -8,4 +8,12 @@ sources:
       - name: al_raw_data
         description: |
           Contains raw data on AL
-        
+      - name: postal_codes_raw
+        description: |
+          Contains raw data on postcodes
+      - name: postal_code_lookup
+        description: |
+          Additionally looked up postal codes
+      - name: postal_code_invalid
+        description: |
+          Contains invalid postal codes

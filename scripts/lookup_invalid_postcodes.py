@@ -47,6 +47,9 @@ def main(
     conn = duckdb.connect(db_path)
     result = list(conn.execute("SELECT postal_code FROM invalid_postcodes").fetchall())
     conn.close()
+    if not result:
+        log.info("No invalid postcodes found in the database.")
+        return
 
     ensure_csv_headers(
         lookup_csv,
@@ -71,7 +74,7 @@ def main(
 
         for (postcode,) in result:
             if postcode in existing_postcodes:
-                log.info(f"Skipping already processed postcode: {postcode}")
+                # log.info(f"Skipping already processed postcode: {postcode}")
                 continue
             data = lookup_postcode(postcode)
             if data:

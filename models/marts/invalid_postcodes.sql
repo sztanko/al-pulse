@@ -1,4 +1,7 @@
-SELECT DISTINCT al.postal_code FROM {{ ref('al_list') }} AS al
+SELECT
+    al.postal_code,
+    count(*) AS num_properties
+FROM {{ ref('al_list') }} AS al
 WHERE
     NOT EXISTS (
         SELECT 1
@@ -10,3 +13,5 @@ WHERE
     AND al.postal_code IS NOT null
     -- doesn't end with 000
     AND al.postal_code !~ '000$'
+GROUP BY 1
+ORDER BY 2 DESC
