@@ -25,17 +25,20 @@ osmium tags-filter $portugal_osm_data r/boundary=administrative -o "$OSM_DATA/ad
 osmium export "$OSM_DATA/admin.osm.pbf" -o "$OSM_DATA/admin.geojson" -f geojson --overwrite
 rm "$OSM_DATA/admin.osm.pbf"
 
-ogr2ogr -f GeoJSON -overwrite downloads/osm/admin.geojson \
-  -where "boundary = 'administrative'" \
+
+ogr2ogr -f GeoJSON -overwrite downloads/osm/buildings.geojson \
+  -where "building = 'yes'" \
   -skipfailures \
   downloads/osm/portugal-latest.osm.pbf \
   multipolygons
 
+ogr2ogr -f GeoJSON -overwrite downloads/osm/roads.geojson \
+  -where "highway in ('secondary', 'tertiary', 'residential', 'unclassified', 'trunc')" \
+  -skipfailures \
+  downloads/osm/portugal-latest.osm.pbf \
+  lines
 
-osmium tags-filter $portugal_osm_data r/building=yes -o "$OSM_DATA/buildings.osm.pbf" --overwrite
-osmium export "$OSM_DATA/buildings.osm.pbf" -o "$OSM_DATA/buildings.geojson" -f geojson --overwrite 
-rm "$OSM_DATA/buildings.osm.pbf"
 
-osmium tags-filter $portugal_osm_data r/highway=* -o "$OSM_DATA/roads.osm.pbf" --overwrite
-osmium export "$OSM_DATA/roads.osm.pbf" -o "$OSM_DATA/roads.geojson" -f geojson --overwrite
-rm "$OSM_DATA/roads.osm.pbf"
+# osmium tags-filter $portugal_osm_data w/highway=* -o "$OSM_DATA/roads.osm.pbf" --overwrite
+#osmium export "$OSM_DATA/roads.osm.pbf" -o "$OSM_DATA/roads.geojson" -f geojson --overwrite
+# rm "$OSM_DATA/roads.osm.pbf"

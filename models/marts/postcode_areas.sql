@@ -1,11 +1,9 @@
-{{ config(materialized='table') }}
-
 WITH points AS (
     SELECT
         postcode,
         district,
         municipality,
-        ST_POINT(lng, lat) AS geom
+        ST_POINT(lng, lat)::GEOMETRY AS geom
     FROM {{ ref('postcodes') }}
 ),
 
@@ -31,7 +29,7 @@ labeled AS (
         p.district,
         p.municipality,
         e.geom,
-        p.geom AS point_geom,
+        p.geom AS point_geom
     FROM exploded AS e
     INNER JOIN points AS p
         ON ST_CONTAINS(e.geom, p.geom)
@@ -48,6 +46,8 @@ with_municipality AS (
     FROM labeled AS l
     INNER JOIN {{ ref('admin') }} AS a
         ON ST_CONTAINS(a.geom, l.point_geom)
+    INNER JOIN {{ ref('populated_areas') }} AS pa
+        ON ST_CONTAINS(pa.geom, l.point_geom)
     WHERE a.is_leaf
 ),
 

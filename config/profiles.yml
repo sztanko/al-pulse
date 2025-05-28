@@ -4,4 +4,6 @@ al_pulse:
       type: duckdb
       path: data/prod.duckdb
       threads: 4
+      extensions:
+        - spatial
   target: prod
