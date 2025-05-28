@@ -17,3 +17,14 @@ sources:
       - name: postal_code_invalid
         description: |
           Contains invalid postal codes
+  - name: geojson
+    tables:
+      - name: admin
+        config:
+          external_location: "downloads/osm/boundaries.geojson"
+      - name: buildings
+        config:
+          external_location: "downloads/osm/buildings.geojson"
+      - name: roads
+        config:
+          external_location: "downloads/osm/roads.geojson"
