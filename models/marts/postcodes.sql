@@ -1,13 +1,12 @@
+{{
+    config(
+        materialized='table',
+        post_hook='CREATE INDEX IF NOT EXISTS idx_postcode_areas_geom ON {{ this }} USING RTREE(geom)',
+        pre_hook='DROP INDEX IF EXISTS idx_postcode_areas_geom'
+    )
+}}
+
 WITH valid_postcodes_all AS (
-    SELECT DISTINCT
-        cp7 AS postcode,
-        -- lower(cp_alpha) AS title,
-        district,
-        municipality,
-        lat,
-        lng
-    FROM {{ ref('stg_postal_codes_raw') }}
-    UNION
     SELECT DISTINCT
         postcode,
         -- title,
@@ -19,6 +18,15 @@ WITH valid_postcodes_all AS (
     WHERE
         postcode = query_postcode
         AND lat IS NOT null
+    UNION
+    SELECT DISTINCT
+        cp7 AS postcode,
+        -- lower(cp_alpha) AS title,
+        district,
+        municipality,
+        lat,
+        lng
+    FROM {{ ref('stg_postal_codes_raw') }}
 ),
 
 postcodes_with_num AS (
@@ -184,4 +192,7 @@ combined_result AS (
     WHERE ip.closest_valid_postcode IS NOT null
 )
 
-SELECT * FROM combined_result
+SELECT
+    *,
+    st_point(lng, lat)::geometry AS geom
+FROM combined_result

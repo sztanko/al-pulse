@@ -1,3 +1,8 @@
+{{ config(
+    materialized='view',
+    
+) }}
+
 WITH features AS (
     SELECT geom FROM st_read({{ source("geojson", "buildings") }})
     UNION ALL
@@ -31,5 +36,5 @@ with_geom AS (
 )
 
 SELECT geom
-    -- st_area_spheroid(geom.geom) AS area
+-- st_area_spheroid(geom.geom) AS area
 FROM with_geom

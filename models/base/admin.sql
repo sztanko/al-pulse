@@ -1,3 +1,10 @@
+{{
+    config(
+        post_hook="CREATE INDEX IF NOT EXISTS idx_admin_areas_geom ON {{ this }} USING RTREE(geom)",
+        materialized='table'
+    )
+}}
+
 WITH admin_areas AS (
     SELECT
         osm_id,

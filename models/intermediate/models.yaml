@@ -1,0 +1,6 @@
+version: 2
+
+models:
+  - name: duplicate_postcodes
+    description: >
+      postcodes with duplicate coordinates.

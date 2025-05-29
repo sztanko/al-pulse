@@ -1,4 +1,10 @@
-select year(registration_date) , count(1) as num_properties
-from {{ ref("stg_al_list") }}
-group by 1
-order by 1;
+select *,
+
+ST_AsText(geom) from {{ ref("postcodes") }}
+
+where postcode in (
+    '1100-000',
+    '1100-998',
+    '1100-999',
+    '1100-995'
+    )

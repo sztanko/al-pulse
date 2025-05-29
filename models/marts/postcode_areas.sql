@@ -1,3 +1,10 @@
+{{
+    config(
+        materialized='table',
+        post_hook="CREATE INDEX IF NOT EXISTS idx_postcode_areas_geom ON {{ this }} USING RTREE(geom)",
+    )
+}}
+
 WITH points AS (
     SELECT
         postcode,
@@ -5,6 +12,7 @@ WITH points AS (
         municipality,
         ST_POINT(lng, lat)::GEOMETRY AS geom
     FROM {{ ref('postcodes') }}
+    WHERE is_valid IS TRUE
 ),
 
 geom_collection AS (
@@ -44,21 +52,34 @@ with_municipality AS (
         l.geom,
         a.geom AS admin_geom
     FROM labeled AS l
-    INNER JOIN {{ ref('admin') }} AS a
-        ON ST_CONTAINS(a.geom, l.point_geom)
-    INNER JOIN {{ ref('populated_areas') }} AS pa
-        ON ST_CONTAINS(pa.geom, l.point_geom)
-    WHERE a.is_leaf
+    INNER JOIN {{ ref("admin_split") }} AS a
+        ON ST_INTERSECTS(l.geom, a.geom)
+-- INNER JOIN {{ ref('populated_areas') }} AS pa
+--     ON ST_CONTAINS(pa.geom, l.point_geom)
+-- WHERE a.is_leaf
 ),
 
 -- Final clipped output
+with_all_admins AS (
+    SELECT
+        postcode,
+        district,
+        municipality,
+        geom,
+        ST_UNION_AGG(admin_geom) AS admin_geom_united
+    FROM with_municipality
+    GROUP BY postcode, district, municipality, geom
+),
+
 clipped AS (
     SELECT
         postcode,
         district,
         municipality,
-        ST_INTERSECTION(geom, admin_geom) AS geom
-    FROM with_municipality
+        ST_INTERSECTION(geom, admin_geom_united) AS geom
+        -- admin_geom
+    FROM with_all_admins
 )
 
 SELECT * FROM clipped
+-- where ST_AREA(geom) > 0
