@@ -32,6 +32,7 @@ WITH source_data AS (
         cast(lat AS double) AS lat
 
     FROM {{ source('raw', 'postal_codes_raw') }}
+    WHERE trim(cp7) ~ '^\d{4}-\d{3}$'
 
 )
 

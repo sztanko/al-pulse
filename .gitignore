@@ -7,3 +7,4 @@ node_modules/
 downloads/al/*.csv
 data/prod.duckdb
 __pycache__
+*.osm.pbf

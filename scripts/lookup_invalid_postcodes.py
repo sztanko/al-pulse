@@ -8,6 +8,7 @@ from lookup_postcode import lookup_postcode  # assuming it's in lookup_postcode.
 import logging
 
 app = typer.Typer(pretty_exceptions_enable=False)
+SLEEP_TIME = 0.1
 
 DEFAULT_DB = "data/prod.duckdb"
 DEFAULT_OUTPUT_DIR = Path("downloads/postal_code")
@@ -45,7 +46,11 @@ def main(
             existing_postcodes.update({row[0] for row in reader if row})
 
     conn = duckdb.connect(db_path)
-    result = list(conn.execute("SELECT distinct postal_code FROM invalid_postcodes").fetchall())
+    result = list(
+        conn.execute(
+            "SELECT postal_code, num_properties FROM postcodes_to_lookup"
+        ).fetchall()
+    )
     conn.close()
     if not result:
         log.info("No invalid postcodes found in the database.")
@@ -72,7 +77,7 @@ def main(
         valid_writer = csv.writer(valid_f)
         invalid_writer = csv.writer(invalid_f)
 
-        for (postcode,) in result:
+        for postcode, prop_count in result:
             if postcode in existing_postcodes:
                 # log.info(f"Skipping already processed postcode: {postcode}")
                 continue
@@ -91,10 +96,12 @@ def main(
                     ]
                 )
                 log.info(f"Valid: {postcode}")
+                valid_f.flush()
             else:
                 invalid_writer.writerow([postcode])
                 log.info(f"Invalid: {postcode}")
-            time.sleep(1)
+                invalid_f.flush()
+            time.sleep(SLEEP_TIME)
 
 
 if __name__ == "__main__":

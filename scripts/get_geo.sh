@@ -19,11 +19,11 @@ else
 fi
 
 # extract admin boundaries
-echo "Extracting admin boundaries from OSM data..."
-# need to extract all admin, buildings, and roads data
-osmium tags-filter $portugal_osm_data r/boundary=administrative -o "$OSM_DATA/admin.osm.pbf" --overwrite
-osmium export "$OSM_DATA/admin.osm.pbf" -o "$OSM_DATA/admin.geojson" -f geojson --overwrite
-rm "$OSM_DATA/admin.osm.pbf"
+ogr2ogr -f GeoJSON -overwrite downloads/osm/landuse.geojson \
+  -where "landuse = 'residential'" \
+  -skipfailures \
+  downloads/osm/portugal-latest.osm.pbf \
+  multipolygons
 
 
 ogr2ogr -f GeoJSON -overwrite downloads/osm/buildings.geojson \

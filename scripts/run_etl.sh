@@ -22,21 +22,12 @@ duckdb -c  "
 CREATE TABLE IF NOT EXISTS al_raw_data AS
 SELECT * FROM read_csv_auto('$AL_DATA/*.csv.gz', header=True);
 " "$DUCKDB_LOCATION"
-# now, load data from postal code invalid_postal_codes and postal_code_lookup
-duckdb -c "
-CREATE TABLE IF NOT EXISTS postal_code_invalid AS
-SELECT * FROM read_csv_auto('$POSTAL_CODE_DATA/invalid_postal_codes.csv', header=True)
-" "$DUCKDB_LOCATION"
 
 duckdb -c "
 CREATE TABLE IF NOT EXISTS postal_codes_raw AS
 SELECT * FROM read_csv_auto('$POSTAL_CODE_DATA/postal_codes_raw.csv.gz', header=True)
 " "$DUCKDB_LOCATION"
 
-duckdb -c "
-CREATE TABLE IF NOT EXISTS postal_code_lookup AS
-SELECT * FROM read_csv_auto('$POSTAL_CODE_DATA/postal_code_lookup.csv', header=True);
-" "$DUCKDB_LOCATION"
 
 dbt seed && dbt run
 python scripts/lookup_invalid_postcodes.py

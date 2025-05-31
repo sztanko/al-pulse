@@ -1,5 +1,6 @@
 {{
     config(
+        pre_hook="DROP INDEX IF EXISTS idx_admin_areas_geom",
         post_hook="CREATE INDEX IF NOT EXISTS idx_admin_areas_geom ON {{ this }} USING RTREE(geom)",
         materialized='table'
     )

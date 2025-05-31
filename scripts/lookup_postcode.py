@@ -57,25 +57,29 @@ def lookup_postcode(postcode: str) -> Optional[Dict[str, str]]:
         if not all([title_elem, cp_elem, gps_elem, local_elem]):
             return None
         if gps_elem.text:
+            # log.info(f"GPS data found: {gps_elem.text}")
             result = gps_elem.text.replace("GPS:", "").strip().split(',')
             if len(result) == 2:
-                lat, lon = map(str.strip, result)
+                lat, lng = map(str.strip, result)
             else:
                 log.warning(f"GPS format is incorrect: {gps_elem.text}")
                 lat, lng = None, None
         else:
             lat, lng = None, None
-
+        # log.info(local_elem)
         if local_elem:
             locality_info = local_elem.text.strip().split(',')
         else:
             locality_info = []
-        if len(locality_info) != 3:
+        if len(locality_info) < 2:
             return None
+        if len(locality_info) == 2:
+            municipality, district = map(str.strip, locality_info)
+            locality = municipality
+        if len(locality_info) == 3:
+            locality, municipality, district = map(str.strip, locality_info)
 
-        locality, municipality, district = map(str.strip, locality_info)
-
-        return {
+        out= {
             "title": title_elem.text.strip(),
             "returned_postal_code": cp_elem.text.strip(),
             "district": district,
@@ -84,6 +88,8 @@ def lookup_postcode(postcode: str) -> Optional[Dict[str, str]]:
             "lat": lat,
             "lng": lng,
         }
+        log.info(f"Parsed data: {out}")
+        return out
 
     except Exception as e:
         log.exception("Parsing error")

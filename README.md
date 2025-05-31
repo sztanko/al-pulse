@@ -4,10 +4,16 @@ Analysis of Portuguese AL (Alojamento Local) data. Focus on historical growth, s
 
 ## Sources
 - Portugal OSM: https://download.geofabrik.de/europe/portugal-latest.osm.pbf - here is a tutorial: https://towardsdatascience.com/how-to-read-osm-data-with-duckdb-ffeb15197390/
+- admin areas: https://dados.gov.pt/en/datasets/distritos-de-portugal/ and https://dados.gov.pt/en/datasets/freguesias-de-portugal/ 
 - postcode data: https://raw.githubusercontent.com/temospena/CP7/refs/heads/master/CP7%20Portugal/CP7_Portugal_nov2022.txt
 - census data: https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&lang=PT&varcd=0011609
 - al data: https://rnt.turismodeportugal.pt/RNT/Pesquisa_AL.aspx
+  - al data for azores: https://www.azores.gov.pt/NR/rdonlyres/F5B6CDB9-24D1-4EE9-8AB2-1D5B141A21DE/0/ALDRT27022018smg.pdf
+  - see info: https://portal.azores.gov.pt/web/drturismo/alojamento-local
+  - https://www.azores.gov.pt/Portal/pt/entidades/sreat-drturismo/livres/aloj-local3.htm - list of ALs in Azores, found here: https://business.turismodeportugal.pt/SiteCollectionDocuments/alojamento-local/guia-alojamento-local-jan-2025.pdf?
 
+Btw, nice AL mapping visualization: https://dadosabertos.turismodeportugal.pt/datasets/4e62eb1977564991bd01e61d7aa8266f_6/explore?location=39.567599%2C-8.411836%2C12.89
+https://dadosabertos.turismodeportugal.pt/datasets/4e62eb1977564991bd01e61d7aa8266f_6/explore?location=38.706161%2C-8.988947%2C14.03
 ## Tools
 
 Duckdb for data storage, Evidence.dev for data visualization, python for ETL. Consider using DBT for models.

@@ -31,3 +31,5 @@ models:
       +materialized: ephemeral
     marts:
       +materialized: table
+    intermediate:
+      +materialized: ephemeral

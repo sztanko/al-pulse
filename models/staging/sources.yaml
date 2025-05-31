@@ -11,12 +11,17 @@ sources:
       - name: postal_codes_raw
         description: |
           Contains raw data on postcodes
+        external_location: "downloads/postal_code/postal_codes_raw.csv.gz"
       - name: postal_code_lookup
         description: |
           Additionally looked up postal codes
+        config:
+          external_location: "downloads/postal_code/postal_code_lookup.csv"
       - name: postal_code_invalid
         description: |
           Contains invalid postal codes
+        config:
+          external_location: "downloads/postal_code/invalid_postal_codes.csv"
   - name: geojson
     tables:
       - name: admin

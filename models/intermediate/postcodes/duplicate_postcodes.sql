@@ -1,9 +1,3 @@
-{{
-    config(
-        materialized="ephemeral",
-    )
-}}
-
 WITH
 duplicate_coords AS (
     SELECT
