@@ -17,7 +17,8 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
-
+on-run-start: # SQL statements to run at the start of a dbt run
+  - "{{ register_macros() }}"
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 

@@ -6,27 +6,27 @@ WITH source_data AS (
         cast(cconcelho AS integer) AS municipality_code,
         cast(clocalidade AS integer) AS locality_code,
 
-        trim(distrito) AS district,
-        trim(concelho) AS municipality,
-        trim(localidade) AS locality,
+        capitalize(trim(distrito)) AS district,
+        capitalize(trim(concelho)) AS municipality,
+        capitalize(trim(localidade)) AS locality,
 
         trim(carteria) AS artery_code,
         trim(mortipo) AS street_type,
         trim(mor1preposicao) AS preposition_1,
         trim(mortitulo) AS title,
         trim(mor2preposicao) AS preposition_2,
-        trim(mordesignacao) AS street_name,
-        trim(morlocal) AS location,
+        capitalize(trim(mordesignacao)) AS street_name,
+        capitalize(trim(morlocal)) AS location,
         trim(cliente) AS client,
-        trim(morada) AS address,
+        capitalize(trim(morada)) AS address,
         trim(mortroco) AS street_section,
         trim(porta) AS door_number,
 
         cast(cp4 AS integer) AS cp4,
         cast(cp3 AS integer) AS cp3,
         trim(cpalfa) AS cp_alpha,
-        trim(cp7) AS cp7,
-        trim(codigopostal) AS full_postal_code,
+        lower(trim(cp7)) AS cp7,
+        capitalize(trim(codigopostal)) AS full_postal_code,
 
         cast(long AS double) AS lng,
         cast(lat AS double) AS lat
@@ -37,3 +37,5 @@ WITH source_data AS (
 )
 
 SELECT * FROM source_data
+WHERE
+    TRUE

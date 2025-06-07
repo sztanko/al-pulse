@@ -9,7 +9,7 @@
 WITH admin_areas AS (
     SELECT
         osm_id,
-        name,
+        capitalize(name) AS name,
         admin_level::INT AS admin_level,
         geom
     FROM st_read({{ source("geojson", "admin") }})
@@ -28,7 +28,7 @@ with_parents AS (
     FROM admin_areas AS child
     LEFT JOIN admin_areas AS parent
         ON
-            st_contains(parent.geom, st_centroid(child.geom))
+            st_contains(parent.geom, child.geom)
             AND child.admin_level > parent.admin_level
 ),
 
@@ -69,25 +69,28 @@ top_level_parents AS (
 
 parents_only AS (
     SELECT DISTINCT parent_id FROM top_level_parents
+),
+
+result AS (
+    SELECT
+        a.osm_id,
+        capitalize(a.name) AS name,
+        a.admin_level,
+        np.num_parents AS depth,
+        rp.parent_id,
+        capitalize(rp.parent_name) AS parent_name,
+        rp.parent_level,
+        capitalize(np.parent_path) AS parent_path,
+        a.geom,
+        pp.parent_id IS NULL AS is_leaf
+
+    FROM admin_areas AS a
+    LEFT JOIN num_parents AS np
+        ON a.osm_id = np.osm_id
+    LEFT JOIN top_level_parents AS rp
+        ON a.osm_id = rp.osm_id
+    LEFT JOIN parents_only AS pp
+        ON a.osm_id = pp.parent_id
 )
 
-SELECT
-    a.osm_id,
-    a.name,
-    a.admin_level,
-    np.num_parents AS depth,
-    rp.parent_id,
-    rp.parent_name,
-    rp.parent_level,
-    np.parent_path,
-    a.geom,
-    pp.parent_id IS NULL AS is_leaf
-
-FROM admin_areas AS a
-LEFT JOIN num_parents AS np
-    ON a.osm_id = np.osm_id
-LEFT JOIN top_level_parents AS rp
-    ON a.osm_id = rp.osm_id
-LEFT JOIN parents_only AS pp
-    ON a.osm_id = pp.parent_id
--- WHERE a.name LIKE '%Calheta%'
+SELECT * FROM result

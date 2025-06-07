@@ -79,7 +79,22 @@ clipped AS (
         ST_INTERSECTION(geom, admin_geom_united) AS geom
         -- admin_geom
     FROM with_all_admins
+),
+
+al_per_postcode AS (
+    SELECT
+        real_postcode,
+        COUNT(*) AS al_count
+    FROM {{ ref('stg_al_list') }} AS al
+    LEFT JOIN {{ ref('postcodes') }} AS p
+        ON al.postal_code = p.postcode
+    GROUP BY real_postcode
 )
 
-SELECT * FROM clipped
+SELECT
+    clipped.*,
+    al_count
+FROM clipped
+LEFT JOIN al_per_postcode
+    ON clipped.postcode = al_per_postcode.real_postcode
 -- where ST_AREA(geom) > 0

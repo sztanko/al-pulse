@@ -12,3 +12,4 @@ WHERE
         FROM {{ ref("invalid_postcodes_api") }}
     )
     AND lng IS NOT NULL
+    AND lat IS NOT NULL

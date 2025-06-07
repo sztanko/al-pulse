@@ -10,44 +10,83 @@ renamed AS (
         etl_timestamp,
 
         regexp_replace("Nº de registo", '/AL$', '') AS al_id,
-        "Nº de registo" AS registration_number,
+        trim("Nº de registo") AS registration_number,
 
-        "Data do registo"::date AS registration_date,
-        "Nome do Alojamento" AS lodging_name,
+        trim("Data do registo"::text)::date AS registration_date,
+        trim("Nome do Alojamento") AS lodging_name,
 
         CASE
-            WHEN "Imóvel posterior a 1951" = 'S' THEN true
-            WHEN "Imóvel posterior a 1951" = 'N' THEN false
+            WHEN trim("Imóvel posterior a 1951") = 'S' THEN true
+            WHEN trim("Imóvel posterior a 1951") = 'N' THEN false
         END AS is_building_post_1951,
 
-        "Data Abertura Público"::date AS public_opening_date,
-        modalidade AS modality,
-        "Nº Camas"::integer AS beds,
-        "Nº Utentes"::integer AS max_guests,
-        "Nº Quartos"::integer AS rooms,
-        "Nº Beliches"::integer AS bunk_beds,
+        trim("Data Abertura Público"::text)::date AS public_opening_date,
+        modalidade AS house_type,
+        trim("Nº Camas"::text)::integer AS beds,
+        trim("Nº Utentes"::text)::integer AS max_guests,
+        trim("Nº Quartos"::text)::integer AS rooms,
+        trim("Nº Beliches"::text)::integer AS bunk_beds,
 
-        "Localização (Endereço)" AS address,
-        "Localização (Código postal)" AS postal_code,
-        "Localização (Localidade)" AS locality,
-        "Localização (Freguesia)" AS parish,
-        "Localização (Concelho)" AS municipality,
-        "Localização (Distrito)" AS district,
-        "NUTT II" AS region_nuts_ii,
+        trim("Localização (Endereço)") AS address,
+        trim("Localização (Código postal)") AS postal_code,
+        trim("Localização (Localidade)") AS locality,
+        trim("Localização (Freguesia)") AS parish,
+        trim("Localização (Concelho)") AS municipality,
+        trim("Localização (Distrito)") AS district,
+        trim("NUTT II") AS region_nuts_ii,
 
-        "Nome do Titular da Exploração" AS operator_name,
-        "Titular Qualidade" AS operator_quality,
+        trim("Nome do Titular da Exploração") AS operator_name,
+        trim("Titular Qualidade") AS operator_quality,
         contribuinte::bigint AS taxpayer_id,
-        "Titular Tipo" AS operator_type,
-        "Titular País" AS operator_country,
+        trim("Titular Tipo") AS operator_type,
+        trim("Titular País") AS operator_country,
 
-        "Contacto Telefone" AS phone,
-        "Contacto Fax" AS fax,
-        "Contacto Telemovel" AS mobile,
-        "Contacto Email" AS email
-
+        trim("Contacto Telefone") AS phone,
+        trim("Contacto Fax") AS fax,
+        trim("Contacto Telemovel") AS mobile,
+        trim("Contacto Email") AS email
     FROM source
+),
 
+capitalized AS (
+    SELECT
+        etl_timestamp,
+        al_id,
+        registration_number,
+        registration_date,
+        capitalize(lodging_name) AS lodging_name,
+        is_building_post_1951,
+        public_opening_date,
+        house_type,
+        beds,
+        max_guests,
+        rooms,
+        address,
+        postal_code,
+        capitalize(locality) AS locality,
+        capitalize(parish) AS parish,
+        capitalize(municipality) AS municipality,
+        capitalize(district) AS district,
+        region_nuts_ii,
+        operator_name,
+        operator_quality,
+        taxpayer_id AS tax_id, -- Use 'tax_id' for consistency with other models
+        operator_type,
+        operator_country,
+        phone,
+        fax,
+        mobile,
+        email,
+        row_number() OVER (
+            PARTITION BY al_id
+            ORDER BY etl_timestamp DESC
+        ) AS rownum
+    FROM renamed
+),
+
+deduplicated AS (
+    SELECT * FROM capitalized
+    WHERE rownum = 1
 )
 
-SELECT * FROM renamed
+SELECT * FROM deduplicated
