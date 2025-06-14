@@ -17,8 +17,8 @@ result AS (
     WHERE (
         NOT EXISTS (
             SELECT 1
-            FROM {{ ref('clean_postcodes_bulk') }} AS p
-            WHERE p.postcode = al.postal_code
+            FROM {{ ref('clean_postcodes_bulk') }} AS cpb
+            WHERE cpb.postcode = al.postal_code
         )
         AND NOT EXISTS (
             SELECT 1

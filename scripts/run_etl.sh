@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS postal_codes_raw AS
 SELECT * FROM read_csv_auto('$POSTAL_CODE_DATA/postal_codes_raw.csv.gz', header=True)
 " "$DUCKDB_LOCATION"
 
+gunzip -kf downloads/osm/admin.geojson.gz
 
 dbt seed && dbt run
 python scripts/lookup_invalid_postcodes.py

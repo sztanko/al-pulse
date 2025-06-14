@@ -2,7 +2,8 @@ INPUT_DIR="downloads"
 OSM_DATA="$INPUT_DIR/osm"
 osm_file_name="portugal-latest.osm.pbf"
 portugal_osm_data="$OSM_DATA/$osm_file_name"
-
+# See https://docs.geodesk.com/python/quickstart
+GOL_LOCATION="~/Downloads/gol-tool-1.0.2/bin/gol"
 
 if [ ! -d "$OSM_DATA" ]; then
   mkdir -p "$OSM_DATA"
@@ -18,27 +19,8 @@ else
   echo "OSM data for Portugal already exists at $portugal_osm_data."
 fi
 
-# extract admin boundaries
-ogr2ogr -f GeoJSON -overwrite downloads/osm/landuse.geojson \
-  -where "landuse = 'residential'" \
-  -skipfailures \
-  downloads/osm/portugal-latest.osm.pbf \
-  multipolygons
+$GOL_LOCATION build downloads/osm/portugal.gol downloads/osm/portugal-latest.osm.pbf
 
-
-ogr2ogr -f GeoJSON -overwrite downloads/osm/buildings.geojson \
-  -where "building = 'yes'" \
-  -skipfailures \
-  downloads/osm/portugal-latest.osm.pbf \
-  multipolygons
-
-ogr2ogr -f GeoJSON -overwrite downloads/osm/roads.geojson \
-  -where "highway in ('secondary', 'tertiary', 'residential', 'unclassified', 'trunc')" \
-  -skipfailures \
-  downloads/osm/portugal-latest.osm.pbf \
-  lines
-
-
-# osmium tags-filter $portugal_osm_data w/highway=* -o "$OSM_DATA/roads.osm.pbf" --overwrite
-#osmium export "$OSM_DATA/roads.osm.pbf" -o "$OSM_DATA/roads.geojson" -f geojson --overwrite
-# rm "$OSM_DATA/roads.osm.pbf"
+python scripts/create_admin_shapefiles.py downloads/osm/portugal-latest.osm.pbf --output downloads/osm/admin.geojson
+rm -f downloads/osm/admin.geojson.gz
+gzip -9 downloads/osm/admin.geojson

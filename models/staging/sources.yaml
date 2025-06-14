@@ -26,10 +26,5 @@ sources:
     tables:
       - name: admin
         config:
-          external_location: "downloads/osm/boundaries.geojson"
-      - name: buildings
-        config:
-          external_location: "downloads/osm/buildings.geojson"
-      - name: roads
-        config:
-          external_location: "downloads/osm/roads.geojson"
+          external_location: "downloads/osm/admin.geojson"
+      

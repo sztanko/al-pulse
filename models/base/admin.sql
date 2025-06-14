@@ -11,6 +11,7 @@ WITH admin_areas AS (
         osm_id,
         capitalize(name) AS name,
         admin_level::INT AS admin_level,
+        population,
         geom
     FROM st_read({{ source("geojson", "admin") }})
 ),

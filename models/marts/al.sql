@@ -25,9 +25,3 @@ WITH full_mapping AS (
 )
 
 SELECT * FROM full_mapping
-
-WHERE TRUE
--- and municipality_name = 'Funchal'
--- and locality_name is null 
-
--- where locality='Funchal'

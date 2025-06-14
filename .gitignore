@@ -5,6 +5,7 @@ logs/
 .venv
 node_modules/
 downloads/al/*.csv
+downloads/osm/admin.geojson
 data/prod.duckdb
 __pycache__
 *.osm.pbf
