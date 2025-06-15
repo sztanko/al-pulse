@@ -62,11 +62,28 @@ capitalized AS (
         max_guests,
         rooms,
         address,
-        postal_code,
+        CASE
+            WHEN postal_code IS null THEN '0000-000'
+            WHEN postal_code ~ '^\d{4}-\d{3}$' THEN postal_code
+            WHEN postal_code ~ '^\d{4}-\d{2}$' THEN concat(postal_code, '0')
+            WHEN postal_code ~ '^\d{4}$' THEN concat(postal_code, '-000')
+            WHEN postal_code ~ '^\d{3}$' THEN concat(postal_code, '0-000')
+            WHEN postal_code ~ '^\d{3}-\d{3}$' THEN concat('0', substring(postal_code, 1, 3), '-000')
+            WHEN postal_code ~ '^\d{2}-\d{3}$' THEN concat('00', substring(postal_code, 1, 2), '-000')
+            WHEN postal_code ~ '^\d{1}-\d{3}$' THEN concat('000', substring(postal_code, 1, 1), '-000')
+            WHEN postal_code ~ '^\d{5}$' THEN concat(substring(postal_code, 1, 4), '-000')
+            -- handle cases like postcode=3660-692,3660-692,3660-692,3660-692 - then take the first part
+            WHEN postal_code ~ '^\d{4}-\d{3},.*$' THEN substring(postal_code, 1, 8)
+            ELSE postal_code
+        END AS postal_code,
         capitalize(locality) AS locality,
         capitalize(parish) AS parish,
-        capitalize(municipality) AS municipality,
-        capitalize(district) AS district,
+        regexp_replace(capitalize(municipality), '(.*)\s+\(.*\)', '\1', 'g') AS municipality,
+        CASE
+            WHEN capitalize(district) = 'Ilha Da Madeira' THEN 'Madeira'
+            WHEN capitalize(district) LIKE 'Ilha D%' THEN 'Açores'
+            ELSE capitalize(district)
+        END AS district,
         region_nuts_ii,
         operator_name,
         operator_quality,

@@ -102,7 +102,7 @@ with_localities_ranked AS (
         AND cwl.locality IS null
 ),
 
-final AS (
+valid_postcodes_with_localities AS (
     SELECT DISTINCT ON (cwl.postcode)
         cwl.postcode,
         coalesce(cwl.locality, rl.locality) AS locality,
@@ -124,4 +124,4 @@ final AS (
 
 )
 
-SELECT * FROM final
+SELECT * FROM valid_postcodes_with_localities

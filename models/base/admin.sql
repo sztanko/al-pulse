@@ -23,6 +23,7 @@ with_parents AS (
         child.name,
         child.admin_level,
         child.geom,
+        child.population,
         parent.osm_id AS parent_id,
         parent.name AS parent_name,
         parent.admin_level AS parent_level
@@ -76,6 +77,7 @@ result AS (
     SELECT
         a.osm_id,
         capitalize(a.name) AS name,
+        a.population,
         a.admin_level,
         np.num_parents AS depth,
         rp.parent_id,
