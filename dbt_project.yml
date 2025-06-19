@@ -33,3 +33,19 @@ models:
       +materialized: table
     intermediate:
       +materialized: ephemeral
+
+vars:
+  metrics:
+    c: normal
+    al_per_1000: normal
+    num_guests: average
+    num_rooms: average
+    is_building_post_1951: pcnt
+    rooms_0: pcnt
+    rooms_1: pcnt
+    rooms_2: pcnt
+    rooms_3: pcnt
+    rooms_more_than_3: pcnt
+    is_moradia: pcnt
+    is_apartamento: pcnt
+

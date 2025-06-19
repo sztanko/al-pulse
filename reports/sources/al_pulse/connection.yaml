@@ -2,4 +2,4 @@
 name: al_pulse
 type: duckdb
 options:
-  filename: al_pulse.duckdb
+  filename: ../../../data/prod.duckdb

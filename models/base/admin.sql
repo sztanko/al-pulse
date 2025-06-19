@@ -8,10 +8,10 @@
 
 WITH admin_areas AS (
     SELECT
-        osm_id,
+        osm_id::INT AS osm_id,
         capitalize(name) AS name,
         admin_level::INT AS admin_level,
-        population,
+        population::INT AS population,
         geom
     FROM st_read({{ source("geojson", "admin") }})
 ),
@@ -79,6 +79,11 @@ result AS (
         capitalize(a.name) AS name,
         a.population,
         a.admin_level,
+        CASE
+            WHEN a.admin_level = 8 THEN 'locality'
+            WHEN a.admin_level = 7 THEN 'municipality'
+            ELSE 'region'
+        END AS admin_type,
         np.num_parents AS depth,
         rp.parent_id,
         capitalize(rp.parent_name) AS parent_name,

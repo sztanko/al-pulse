@@ -2,12 +2,7 @@ WITH
 
 admin_places AS (
     SELECT
-        CASE
-            WHEN a.admin_level = '4' THEN 'region'
-            WHEN a.admin_level = '6' THEN 'region'
-            WHEN a.admin_level = '7' THEN 'municipality'
-            ELSE 'locality'
-        END AS type,
+        a.admin_type AS type,
         a.name,
         a.parent_name,
         a2.parent_name AS grandpa,
@@ -31,7 +26,7 @@ al_regions AS (
     FROM {{ ref('al_unmapped') }} AS al
     LEFT JOIN admin_places AS r
         ON
-            lower(al.district) = lower(r.name)
+            lower(strip_accents(al.district)) = lower(strip_accents(r.name))
     WHERE (r.type = 'region' OR r.type IS null)
 
 ),
@@ -47,8 +42,8 @@ al_municipalities AS (
     FROM {{ ref('al_unmapped') }} AS al
     LEFT JOIN admin_places AS r
         ON
-            lower(al.municipality) = lower(r.name)
-            AND lower(al.district) = lower(r.parent_name)
+            lower(strip_accents(al.municipality)) = lower(strip_accents(r.name))
+            AND lower(strip_accents(al.district)) = lower(strip_accents(r.parent_name))
     WHERE (r.type = 'municipality' OR r.type IS null)
 ),
 
@@ -63,9 +58,9 @@ al_localities AS (
     FROM {{ ref('al_unmapped') }} AS al
     LEFT JOIN admin_places AS l
         ON
-            lower(al.locality) = lower(l.name)
-            AND lower(al.municipality) = lower(l.parent_name)
-            AND lower(al.district) = lower(l.grandpa)
+            lower(strip_accents(al.locality)) = lower(strip_accents(l.name))
+            AND lower(strip_accents(al.municipality)) = lower(strip_accents(l.parent_name))
+            AND lower(strip_accents(al.district)) = lower(strip_accents(l.grandpa))
     WHERE (l.type = 'locality' OR l.type IS null)
 ),
 

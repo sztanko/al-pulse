@@ -77,37 +77,49 @@ with_localities AS (
     WHERE pl.locality IS NOT null
 ),
 
-with_localities_ranked AS (
+geomatching_all AS (
     SELECT
         cwl.postcode,
-        a.name AS locality,
-        a.parent_name AS municipality,
-        municipalities.parent_name AS district,
-        a.osm_id AS locality_id,
-        st_distance(cwl.geom, municipalities.geom) AS distance,
+        localities.name AS locality,
+        localities.osm_id AS locality_id,
+        st_distance(cwl.geom, localities.geom) AS distance,
         row_number() OVER (
             PARTITION BY cwl.postcode
-            ORDER BY st_distance(cwl.geom, municipalities.geom) DESC
+            ORDER BY st_distance(cwl.geom, localities.geom) DESC
         ) AS proximity_rank
     FROM with_localities AS cwl
-    INNER JOIN {{ ref('admin') }} AS municipalities
+    INNER JOIN {{ ref('admin') }} AS localities
         ON
-            municipalities.admin_level = 7
-            AND cwl.locality IS null
-            AND st_contains(municipalities.geom, cwl.geom)
-    INNER JOIN {{ ref('admin') }} AS a
-        ON municipalities.osm_id = a.parent_id
+            localities.admin_type = 'locality'
+            AND st_contains(localities.geom, cwl.geom)
     WHERE
         cwl.is_valid
-        AND cwl.locality IS null
+        AND cwl.geom IS NOT null
+),
+
+geomatching AS (
+    SELECT * FROM geomatching_all
+    WHERE proximity_rank = 1
+),
+
+name_matching AS (
+    SELECT
+        cwl.postcode,
+        localities.name AS locality,
+        localities.osm_id AS locality_id
+    FROM with_localities AS cwl
+    INNER JOIN {{ ref('admin') }} AS localities
+        ON
+            localities.admin_type = 'locality'
+            AND lower(strip_accents(cwl.locality)) = lower(strip_accents(localities.name))
+            AND lower(strip_accents(cwl.municipality)) = lower(strip_accents(localities.parent_name))
 ),
 
 valid_postcodes_with_localities AS (
     SELECT DISTINCT ON (cwl.postcode)
         cwl.postcode,
-        coalesce(cwl.locality, rl.locality) AS locality,
-        coalesce(cwl.municipality, rl.municipality) AS municipality,
-        coalesce(cwl.district, rl.district) AS district,
+        coalesce(nm.locality, rl.locality) AS locality,
+        coalesce(nm.locality_id, rl.locality_id) AS locality_id,
         cwl.lng,
         cwl.lat,
         cwl.is_valid,
@@ -117,11 +129,33 @@ valid_postcodes_with_localities AS (
         -- rl.locality_id,
         -- rl.distance AS locality_distance
     FROM with_localities AS cwl
-    LEFT JOIN with_localities_ranked AS rl
+    LEFT JOIN geomatching AS rl
         ON cwl.postcode = rl.postcode
-    WHERE rl.proximity_rank IS null OR rl.proximity_rank = 1
+    LEFT JOIN name_matching AS nm
+        ON cwl.postcode = nm.postcode
     ORDER BY cwl.postcode ASC, cwl.is_valid DESC, coalesce(cwl.locality, rl.locality) IS null, cwl.geom IS null
+),
 
+with_muni_and_region AS (
+    SELECT
+        vpl.*,
+        m.osm_id AS municipality_id,
+        m.name AS municipality_name,
+        r.osm_id AS region_id,
+        r.name AS region_name
+    FROM valid_postcodes_with_localities AS vpl
+    LEFT JOIN {{ ref('admin') }} AS l
+        ON
+            l.admin_type = 'locality'
+            AND vpl.locality_id = l.osm_id
+    LEFT JOIN {{ ref('admin') }} AS m
+        ON
+            m.admin_type = 'municipality'
+            AND l.parent_id = m.osm_id
+    LEFT JOIN {{ ref('admin') }} AS r
+        ON
+            r.admin_type = 'region'
+            AND m.parent_id = r.osm_id
 )
 
-SELECT * FROM valid_postcodes_with_localities
+SELECT * FROM with_muni_and_region

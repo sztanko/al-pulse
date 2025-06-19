@@ -1,0 +1,1 @@
+select osm_id, name, population, admin_type, parent_id,  from admin

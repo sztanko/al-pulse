@@ -46,7 +46,8 @@ latest_data AS (
 
 SELECT
     ld.*,
-    postcodes.geom
+    ps.geom,
+    ps.real_postcode
 FROM latest_data AS ld
-LEFT JOIN {{ ref('postcodes') }} AS postcodes
-    ON ld.postal_code = postcodes.postcode
+LEFT JOIN {{ ref('postcodes') }} AS ps
+    ON ld.postal_code = ps.postcode
