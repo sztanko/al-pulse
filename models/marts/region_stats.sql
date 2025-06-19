@@ -50,7 +50,7 @@ distinct_combinations_metrics AS (
 
 flattened AS (
     SELECT
-        dcm.area_type,
+        -- dcm.area_type,
         dcm.area_id,
         dcm.year_month,
         {% for metric in var('metrics').keys() %}
@@ -86,4 +86,4 @@ flattened AS (
 )
 
 SELECT * FROM flattened
-ORDER BY area_type, area_id, year_month
+ORDER BY area_id, year_month
