@@ -86,4 +86,5 @@ flattened AS (
 )
 
 SELECT * FROM flattened
+WHERE year_month >= '2012-01-01'
 ORDER BY area_id, year_month

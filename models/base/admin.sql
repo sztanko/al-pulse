@@ -89,8 +89,21 @@ result AS (
         capitalize(rp.parent_name) AS parent_name,
         rp.parent_level,
         capitalize(np.parent_path) AS parent_path,
+        CASE
+            WHEN np.parent_path IS NULL THEN capitalize(a.name)
+            ELSE capitalize(a.name || ', ' || np.parent_path)
+        END AS full_name,
         a.geom,
-        pp.parent_id IS NULL AS is_leaf
+        pp.parent_id IS NULL AS is_leaf,
+        lower(
+            regexp_replace(
+                regexp_replace(
+                    regexp_replace(strip_accents(trim(name || ', ' || coalesce(parent_path, ''))), '[^0-9A-Za-z]+', '_', 'g'),
+                    '_{2,}', '_', 'g'
+                ),
+                '^_|_$', '', 'g'
+            )
+        ) AS slug
 
     FROM admin_areas AS a
     LEFT JOIN num_parents AS np

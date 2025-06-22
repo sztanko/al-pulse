@@ -26,13 +26,19 @@ on-run-start: # SQL statements to run at the start of a dbt run
 # files using the `{{ config(...) }}` macro.
 models:
   al_pulse:
-    # Config indicated by + and applies to all files under models/example/
     staging:
       +materialized: ephemeral
     marts:
       +materialized: table
     intermediate:
       +materialized: ephemeral
+
+seeds:
+  al_pulse:
+    +column_types: # event_date,event_name,description
+      event_date: date
+      event_name: text
+      description: text
 
 vars:
   metrics:

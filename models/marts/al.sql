@@ -53,3 +53,6 @@ full_mapping AS (
 )
 
 SELECT * FROM full_mapping
+WHERE
+    region_osm_id != 1629146 -- exclude Azores
+    AND region_osm_id IS NOT null

@@ -1,1 +1,1 @@
-select osm_id, name, population, admin_type, parent_id,  from admin
+select osm_id, name, full_name, parent_path, population, admin_type, parent_id, slug from admin

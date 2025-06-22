@@ -1,20 +1,20 @@
 {
     "editor.quickSuggestions": {
-        "other": false,
+        "other": true,
         "comments": false,
         "strings": false
     },
     "sqlfluff.linter.run": "onSave",
     "sqlfluff.experimental.format.executeInTerminal": true,
     "editor.formatOnSave": false,
-    "editor.quickSuggestionsDelay": 300,
+    "editor.quickSuggestionsDelay": 0,
     "terminal.integrated.env.osx": {
         "DBT_PROFILES_DIR": "${workspaceFolder}/config",
     },
     "terminal.integrated.env.linux": {
         "DBT_PROFILES_DIR": "${workspaceFolder}/config",
     },
-    "editor.acceptSuggestionOnEnter": true,
+    "editor.acceptSuggestionOnEnter": false,
     "dbt.perspectiveTheme": "Vintage",
     "sqlfluff.dialect": "duckdb",
     "sqlfluff.executablePath": "/Users/dimi/workspace/geoprojects/al_pulse/.venv/bin/sqlfluff",
