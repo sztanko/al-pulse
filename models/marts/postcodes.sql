@@ -1,8 +1,13 @@
 {{
     config(
         materialized='table',
-        post_hook='CREATE INDEX IF NOT EXISTS idx_postcode_areas_geom ON {{ this }} USING RTREE(geom)',
-        pre_hook='DROP INDEX IF EXISTS idx_postcode_areas_geom'
+        pre_hook=[
+            "DROP INDEX IF EXISTS idx_postcode_areas_geom",
+            "SET preserve_insertion_order = FALSE",
+            "PRAGMA max_temp_directory_size = '40GB'"
+        ],
+        post_hook='CREATE INDEX IF NOT EXISTS idx_postcode_areas_geom ON {{ this }} USING RTREE(geom)'
+        
     )
 }}
 
