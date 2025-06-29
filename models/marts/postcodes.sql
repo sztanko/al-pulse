@@ -4,7 +4,9 @@
         pre_hook=[
             "DROP INDEX IF EXISTS idx_postcode_areas_geom",
             "SET preserve_insertion_order = FALSE",
-            "PRAGMA max_temp_directory_size = '40GB'"
+            "SET memory_limit = '3GB'",
+            "PRAGMA temp_directory = '/tmp'",
+            "PRAGMA max_temp_directory_size = '10GB"
         ],
         post_hook='CREATE INDEX IF NOT EXISTS idx_postcode_areas_geom ON {{ this }} USING RTREE(geom)'
         
