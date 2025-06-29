@@ -2,11 +2,7 @@
     config(
         materialized='table',
         pre_hook=[
-            "DROP INDEX IF EXISTS idx_postcode_areas_geom",
-            "SET preserve_insertion_order = FALSE",
-            "SET memory_limit = '6GB'",
-            "PRAGMA temp_directory = '/tmp'",
-            "PRAGMA max_temp_directory_size = '10GB'"
+            "DROP INDEX IF EXISTS idx_postcode_areas_geom"
         ],
         post_hook='CREATE INDEX IF NOT EXISTS idx_postcode_areas_geom ON {{ this }} USING RTREE(geom)'
         
