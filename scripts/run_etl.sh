@@ -5,6 +5,7 @@ source ./scripts/constants.sh
 echo "Running ETL process..."
 
 rm -f $DUCKDB_LOCATION
+mkdir -p "$(dirname "$DUCKDB_LOCATION")"
 duckdb $DUCKDB_LOCATION ".exit"
 
 # Load data into DuckDB

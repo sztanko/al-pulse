@@ -9,6 +9,7 @@ on:
       # Only run if the reports/build directory or the downloads/al directory is changed
       - "reports/build/**"
       - "downloads/al/**"
+      - "scripts/**"
       - .github/workflows/static.yml
 
   # Allows you to run this workflow manually from the Actions tab
