@@ -10,6 +10,9 @@ on:
       - "reports/build/**"
       - "downloads/al/**"
       - "scripts/**"
+      - "models/**"
+      - "requirements.txt"
+      - "dbt_project.yml"
       - .github/workflows/static.yml
 
   # Allows you to run this workflow manually from the Actions tab
