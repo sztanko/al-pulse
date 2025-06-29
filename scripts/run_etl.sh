@@ -22,8 +22,11 @@ SELECT * FROM read_csv_auto('$POSTAL_CODE_DATA/postal_codes_raw.csv.gz', header=
 
 gunzip -kf downloads/osm/admin.geojson.gz
 
-dbt seed && dbt run
+export DBT_PROFILES_DIR=./config
+dbt seed 
+dbt run
 python scripts/lookup_invalid_postcodes.py
-dbt seed && dbt run
+dbt seed
+dbt run
 
 echo "ETL process completed successfully."
