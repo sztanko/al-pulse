@@ -54,15 +54,14 @@ jobs:
         working-directory: reports
         run: npm install
       - name: Run etl
-        run: ./scrtips/run_etl.sh
+        run: ./scripts/run_etl.sh
       - name: Run report generation
-        run: ./scrtips/run_reports.sh
+        run: ./sctipts/run_report.sh
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
           path: 'reports/build'
       - name: Deploy to GitHub Pages
         id: deployment
