@@ -9,6 +9,7 @@ on:
       # Only run if the reports/build directory or the downloads/al directory is changed
       - "reports/build/**"
       - "downloads/al/**"
+      - .github/workflows/static.yml
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -38,7 +39,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'  # Set to your project's required Python version
+          python-version: '3.13'  # Set to your project's required Python version
       - name: Install DuckDB
         uses: opt-nc/setup-duckdb-action@v1.0.11
         with:
