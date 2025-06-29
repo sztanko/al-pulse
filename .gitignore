@@ -10,3 +10,9 @@ data/prod.duckdb
 __pycache__
 *.osm.pbf
 .DS_Store
+*.dbf
+*.prj
+*.shp
+*.shx
+*.geojson
+*.parquet

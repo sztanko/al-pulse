@@ -5,6 +5,10 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
+    paths:
+      # Only run if the reports/build directory or the downloads/al directory is changed
+      - "reports/build/**"
+      - "downloads/al/**"
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -31,6 +35,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'  # Set to your project's required Python version
+      - name: Install DuckDB
+        uses: opt-nc/setup-duckdb-action@v1.0.11
+        with:
+          version: v1.1.3
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm # use cached deps
+          cache-dependency-path: reports/package-lock.json    
+      - name: Install dependencies
+        working-directory: reports
+        run: npm install
+      - name: Run etl
+        run: ./scrtips/run_etl.sh
+      - name: Run report generation
+        run: ./scrtips/run_reports.sh
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

@@ -214,6 +214,7 @@ order by year_month
 
 {#if admin_info[0].admin_type!='locality'}
 
+
 ``` sql region_stats_series
 WITH regional_monthly AS (
     SELECT
@@ -239,17 +240,18 @@ WITH regional_monthly AS (
         rank_within_country      AS rank_prev_year
     FROM regional_monthly
     WHERE month_date = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '3 year'
-), series AS (
-    SELECT
-        region,
-        ARRAY_AGG({'date': month_date, 'al_count': al_count} ORDER BY month_date)            AS al_count_series,
-        ARRAY_AGG({'date': month_date, 'inhabitants_per_al': inhabitants_per_al} ORDER BY month_date)
-                                                                                             AS inhabitants_per_al_series,
-        ARRAY_AGG({'date': month_date, 'rank_within_country': rank_within_country} ORDER BY month_date)
-                                                                                             AS rank_within_country_series              
-    FROM regional_monthly
-    GROUP BY region
 )
+--, series AS (
+--    SELECT
+--        region,
+--        ARRAY_AGG({'date': month_date, 'al_count': al_count} ORDER BY month_date)            AS al_count_series,
+--        ARRAY_AGG({'date': month_date, 'inhabitants_per_al': inhabitants_per_al} ORDER BY month_date)
+--                                                                                             AS inhabitants_per_al_series,
+--        ARRAY_AGG({'date': month_date, 'rank_within_country': rank_within_country} ORDER BY month_date)
+--                                                                                             AS rank_within_country_series              
+--    FROM regional_monthly
+--    GROUP BY region
+--)
 SELECT
     l.region_url,
     l.region,
@@ -257,15 +259,15 @@ SELECT
     l.inhabitants_per_al,
     l.al_per_1000,
     l.rank_within_country,
-    s.al_count_series,                -- sparkline data (count)
-    s.inhabitants_per_al_series,      -- sparkline data (inhabitants per AL)
-    s.rank_within_country_series,     -- sparkline data (rank within country)
+    -- s.al_count_series,                -- sparkline data (count)
+    -- s.inhabitants_per_al_series,      -- sparkline data (inhabitants per AL)
+    -- s.rank_within_country_series,     -- sparkline data (rank within country)
     (l.al_count - p.al_count_prev_year) / NULLIF(p.al_count_prev_year, 0)
                                        AS al_count_growth_pcnt,
     (p.rank_prev_year - l.rank_within_country)                                             
                                        AS rank_within_country_change
 FROM latest l
-LEFT JOIN series    s USING (region)
+-- LEFT JOIN series    s USING (region)
 LEFT JOIN prev_year p USING (region)
 ORDER BY l.region;
 ```
@@ -294,14 +296,7 @@ ORDER BY l.region;
     fmt="pct"
     />
 
-  <Column
-    id="al_count_series"
-    contentType=sparkline
-    title="AL Count Changes"
-    sparkX="date"
-    sparkY="al_count"    
-    />
-
+  
   <Column
     id="inhabitants_per_al"
     title="Inhabitants per AL"
@@ -318,13 +313,7 @@ ORDER BY l.region;
     title="Rank Change"
     contentType=delta
     />
-    <Column
-    id="rank_within_country_series"
-    contentType=sparkline
-    title="Rank Changes"
-    sparkX="date"
-    sparkY="rank_within_country"
-    />
+    
 
 
 </DataTable>
