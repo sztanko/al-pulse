@@ -10,6 +10,7 @@ fi
 rm -f "$table_name.geojson"
 
 duckdb data/prod.duckdb <<EOF
+INSTALL spatial;
 LOAD spatial;
 COPY $table_name
 TO '$table_name.geojson'
