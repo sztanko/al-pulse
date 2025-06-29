@@ -66,7 +66,7 @@ jobs:
       - name: Run etl
         run: ./scripts/run_etl.sh
       - name: Run report generation
-        run: ./sctipts/run_report.sh
+        run: ./scripts/run_report.sh
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
