@@ -94,6 +94,7 @@ geomatching_all AS (
     INNER JOIN {{ ref('admin') }} AS localities
         ON
             localities.admin_type = 'locality'
+            AND st_dwithin(localities.geom, cwl.geom, 0.5)
             AND st_contains(localities.geom, cwl.geom)
     WHERE
         cwl.is_valid
