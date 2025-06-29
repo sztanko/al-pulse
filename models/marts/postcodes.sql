@@ -10,76 +10,6 @@
 }}
 
 WITH
-valid_postcodes AS (
-    SELECT * FROM {{ ref('clean_postcodes_all') }}
-
-),
-
-invalid_postcodes AS (
-    SELECT * FROM {{ ref('invalid_postcodes_lookup') }}
-),
-
-combined_result AS (
-    SELECT
-        postcode,
-        district,
-        municipality,
-        lng,
-        lat,
-        true AS is_valid,
-        'exact' AS correction_type,
-        postcode AS real_postcode
-    FROM valid_postcodes
-    UNION
-    SELECT
-        ip.postcode,
-        vp.district,
-        vp.municipality,
-        vp.lng,
-        vp.lat,
-        false AS is_valid,
-        correction_type,
-        alias_postcode AS real_postcode
-    FROM invalid_postcodes AS ip
-    LEFT JOIN valid_postcodes AS vp
-        ON ip.postcode = vp.postcode
-    WHERE ip.postcode IS NOT null
-),
-
-clean_without_localities AS (
-    SELECT
-        cr.postcode,
-        capitalize(coalesce(cr.district, rp.district)) AS district,
-        capitalize(coalesce(cr.municipality, rp.municipality)) AS municipality,
-        coalesce(cr.lng, rp.lng) AS lng,
-        coalesce(cr.lat, rp.lat) AS lat,
-        cr.is_valid,
-        cr.correction_type,
-        cr.real_postcode,
-        st_point(rp.lng, rp.lat)::geometry AS geom
-    FROM combined_result AS cr
-    LEFT JOIN combined_result AS rp
-        ON cr.real_postcode = rp.postcode
-),
-
-with_localities AS (
-    SELECT
-        cwl.postcode,
-        pl.locality,
-        cwl.district,
-        cwl.municipality,
-        cwl.lng,
-        cwl.lat,
-        cwl.is_valid,
-        cwl.correction_type,
-        cwl.real_postcode,
-        cwl.geom
-    FROM clean_without_localities AS cwl
-    LEFT JOIN {{ ref('postcode_localities') }} AS pl
-        ON cwl.postcode = pl.postcode
-    WHERE pl.locality IS NOT null
-),
-
 geomatching_all AS (
     SELECT
         cwl.postcode,
@@ -90,7 +20,7 @@ geomatching_all AS (
             PARTITION BY cwl.postcode
             ORDER BY st_distance(cwl.geom, localities.geom) DESC
         ) AS proximity_rank
-    FROM with_localities AS cwl
+    FROM {{ ref('postcodes_with_localities') }} AS cwl
     INNER JOIN {{ ref('admin') }} AS localities
         ON
             localities.admin_type = 'locality'
@@ -111,7 +41,7 @@ name_matching AS (
         cwl.postcode,
         localities.name AS locality,
         localities.osm_id AS locality_id
-    FROM with_localities AS cwl
+    FROM {{ ref('postcodes_with_localities') }} AS cwl
     INNER JOIN {{ ref('admin') }} AS localities
         ON
             localities.admin_type = 'locality'
@@ -132,7 +62,7 @@ valid_postcodes_with_localities AS (
         cwl.geom
         -- rl.locality_id,
         -- rl.distance AS locality_distance
-    FROM with_localities AS cwl
+    FROM {{ ref('postcodes_with_localities') }} AS cwl
     LEFT JOIN geomatching AS rl
         ON cwl.postcode = rl.postcode
     LEFT JOIN name_matching AS nm

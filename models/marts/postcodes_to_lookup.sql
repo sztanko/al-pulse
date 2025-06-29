@@ -40,4 +40,4 @@ result AS (
 )
 
 SELECT * FROM result
-where postal_code not like '%000'
+WHERE postal_code NOT LIKE '%000'
