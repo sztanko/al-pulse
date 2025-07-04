@@ -124,6 +124,7 @@ def run_per_month(
         raise typer.BadParameter("Start date must be before or equal to end date.")
     ts = datetime.now()
     if output.exists():
+        log.info(f"Output file {output} already exists. It will be overwritten.")
         output.unlink()  # Clean existing file
 
     with sync_playwright() as p:

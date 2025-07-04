@@ -175,11 +175,11 @@ with_ranking AS (
         metric_name,
         value,
         cumulative_value,
-        dense_rank() OVER (
+        percent_rank() OVER (
             PARTITION BY area_type, context_area_type, context_area_id, metric_name, year_month
             ORDER BY value DESC
         ) AS rank_month,
-        dense_rank() OVER (
+        percent_rank() OVER (
             PARTITION BY area_type, context_area_type, context_area_id, metric_name, year_month
             ORDER BY cumulative_value DESC
         ) AS rank_cumulative

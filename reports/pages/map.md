@@ -13,7 +13,7 @@ select *, id::int::text as osm_id from map
 <AreaMap
     data={admin_map}
     value=c_rank
-    geoJsonUrl='/admin.geojson'
+    geoJsonUrl='/al-pulse/admin.geojson'
     geoId="admin_id"
     areaCol="osm_id"
     height=900
