@@ -3,10 +3,11 @@ SELECT
     a.osm_id::int::text AS admin_id,
     a.name,
     a.full_name,
+    a.slug,
     a.geom,
     a.population,
-    stats.cumulative_value_c::int AS c,
-    stats.country_rank_c AS c_rank,
+    stats.cumulative_value_c::int AS al_count,
+    stats.country_rank_c AS rank_within_country,
     ROUND(1000.0 / stats.cumulative_value_al_per_1000, 2) AS people_per_al,
     stats.country_rank_al_per_1000 AS people_per_al_rank
 FROM {{ ref('admin') }} AS a

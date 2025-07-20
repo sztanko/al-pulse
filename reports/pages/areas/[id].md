@@ -1,5 +1,5 @@
 ---
-breadcrumb: "select full_name as breadcrumb from admin where slug='${params.id}'"
+breadcrumb: "select 'Portugal > ' || parent_path || ' > ' || name as breadcrumb from admin where slug='${params.id}'"
 full_width: true
 hide_breadcrumbs: false
 sidebar: hide
@@ -10,6 +10,11 @@ hide_toc: true
 ```sql admin_info
 select * from admin where slug='${params.id}' limit 1
 ```
+{#if admin_info[0].admin_type == 'locality'}
+{admin_info[0].parent_name}
+
+
+{/if}
 
 ```sql admin_stats
 select s.*,
@@ -32,8 +37,39 @@ where a.slug='${params.id}'
 AND s.year_month = date_trunc('month', current_date)
 ```
 
+```sql admin_level_stats
+select s.cumulative_value_c,
+s.country_rank_c,
+1000 / s.cumulative_value_al_per_1000 as inhabitants_per_al,
+s.country_rank_al_per_1000
+from stats s
+join admin a on a.osm_id=s.area_id
+join admin a2 on a.admin_type=a2.admin_type
+where a2.slug='${params.id}'
+AND s.year_month = date_trunc('month', current_date)
+```
+
+{#if admin_info[0].admin_type!='locality'}
+```sql skew_data
+select * from al_pulse.distribution_skew where slug='${params.id}' and threshold='50'
+```
+{/if}
 
 # {admin_info[0].full_name}
+
+{#if admin_info[0].admin_type == 'locality'}
+← <a href='{admin_info[0].municipality_link}'>Back to {admin_info[0].parent_name}</a>
+
+{:else if admin_info[0].admin_type == 'municipality'}
+← <a href='{admin_info[0].region_link}'>Back to {admin_info[0].parent_name}</a>
+
+{:else if admin_info[0].admin_type == 'region'}
+← <a href='/'>Back to Main page</a>
+
+{/if}
+
+
+
 ### Population: <Value data={admin_info[0]} column=population fmt='#,##0' />
 
 <Grid cols=2>
@@ -83,6 +119,43 @@ AND s.year_month = date_trunc('month', current_date)
 {/if}
 </Grid>
 
+{#if admin_info[0].admin_type!='locality'}
+<Grid cols=2>
+<BigValue
+  title="of localities host 50% of ALs"
+  data={skew_data}
+  value=locality_rank_pcnt
+  fmt="pct1"
+  description="Percentage of localities that host 50% of all Alojamento Local properties in this area"
+  />
+<BigValue
+  title="% live in places with half of all ALs"
+  data={skew_data}
+  value=total_population_pcnt
+  fmt="pct1"
+  description="Percentage of population that lives in localities hosting 50% of all Alojamento Local properties"
+  />
+</Grid>
+{/if}
+
+```sql room_distribution_data
+select * from room_distribution_comparison where slug = '${params.id}'
+```
+
+## Room Distribution Analysis
+
+<BarChart
+  title="Room Distribution Comparison"
+  data={room_distribution_data}
+  x=name
+  y=value
+  series=metric_name
+  type=stacked100
+  swapXY=true
+  xAxisTitle="Geographic Level"
+  yAxisTitle="Percentage"
+  sort=false
+/>
 
 ```sql timeline
 select * from events where event_name not like '#%'
@@ -109,6 +182,7 @@ order by s.year_month
   >
   <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
   </LineChart>
+
 
 ```sql monthly_growth
 with area_hierarchy as (
@@ -137,13 +211,25 @@ s.cumulative_value_c / nullif(s_base.cumulative_value_c, 0) as growth_since_base
 from al_pulse.stats s
 join area_hierarchy a on a.osm_id=s.area_id
 -- join admin parent_a on a.parent_id=parent_a.osm_id
-join al_pulse.stats s_base on s.area_id=s_base.area_id and s_base.year_month = '2018-01-01'
+join al_pulse.stats s_base on s.area_id=s_base.area_id and s_base.year_month = date_trunc('month', current_date + interval '1 month' * ${inputs.base_date})
 
 order by a.ord, s.year_month
 ```
+### Growth compared to { new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+  
+<Slider
+title="Month offset for growth calculation base"
+    name='base_date'
+    size=large
+    maxColumn=max_fare
+    min=-150
+    max=-5
+    showMaxMin=false
+/> 
+
 
 <LineChart
-  title="Growth compared to 2018 (100% is January 2018)"
+  title="100% is { new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })}"
   data={monthly_growth}
   series="area_name"
   y="growth_since_base"
@@ -152,7 +238,13 @@ order by a.ord, s.year_month
   yFmt="pct"
   >
   <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
+  <ReferencePoint 
+  x={ new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date)))} 
+  y=1 label={ new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })} labelPosition=bottom color=base-content-muted/>
+    
   </LineChart>
+
+ 
 
 {#if admin_info[0].admin_type!='locality'}
 
@@ -191,96 +283,136 @@ order by a.name, s.year_month
   {/if}
 {/if}
 
-
-```sql monthly_stats_1951
-select year_month, cumulative_value_is_building_post_1951 as share_of_buildings_post_1951 
-from al_pulse.stats 
-join admin a on a.osm_id=stats.area_id
-where a.slug='${params.id}'
-order by year_month
-```
-
-<LineChart
-  title="Share of buildings built after 1951, %"
-  data={monthly_stats_1951}
-  y="share_of_buildings_post_1951"
-  yAxisTitle="Share of buildings built after 1951, %"
-  xField="year_month"
-  yField="value"
-  yFmt="pct"
-  >
-  <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
-</LineChart>
-
 {#if admin_info[0].admin_type!='locality'}
 
 
-``` sql region_stats_series
-WITH regional_monthly AS (
-    SELECT
-        '/areas/' || a.slug                         AS region_url,
-        a.name                                              AS region,
-        s.year_month                                        AS month_date,
-        s.cumulative_value_c                                AS al_count,
-        s.cumulative_value_al_per_1000                      AS al_per_1000,
-        1000.0 / s.cumulative_value_al_per_1000             AS inhabitants_per_al,
-        s.country_rank_c                                    AS rank_within_country
-    FROM stats s
-    JOIN admin a ON a.osm_id = s.area_id
-    JOIN admin a2 on a.parent_id = a2.osm_id
-    WHERE a2.slug='${params.id}'
-), latest AS (
-    SELECT *
-    FROM regional_monthly
-    WHERE month_date = DATE_TRUNC('month', CURRENT_DATE)
-), prev_year AS (
-    SELECT
-        region,
-        al_count                 AS al_count_prev_year,
-        rank_within_country      AS rank_prev_year
-    FROM regional_monthly
-    WHERE month_date = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '3 year'
-)
---, series AS (
---    SELECT
---        region,
---        ARRAY_AGG({'date': month_date, 'al_count': al_count} ORDER BY month_date)            AS al_count_series,
---        ARRAY_AGG({'date': month_date, 'inhabitants_per_al': inhabitants_per_al} ORDER BY month_date)
---                                                                                             AS inhabitants_per_al_series,
---        ARRAY_AGG({'date': month_date, 'rank_within_country': rank_within_country} ORDER BY month_date)
---                                                                                             AS rank_within_country_series              
---    FROM regional_monthly
---    GROUP BY region
---)
-SELECT
-    l.region_url,
-    l.region,
-    l.al_count,
-    l.inhabitants_per_al,
-    l.al_per_1000,
-    l.rank_within_country,
-    -- s.al_count_series,                -- sparkline data (count)
-    -- s.inhabitants_per_al_series,      -- sparkline data (inhabitants per AL)
-    -- s.rank_within_country_series,     -- sparkline data (rank within country)
-    (l.al_count - p.al_count_prev_year) / NULLIF(p.al_count_prev_year, 0)
-                                       AS al_count_growth_pcnt,
-    (p.rank_prev_year - l.rank_within_country)                                             
-                                       AS rank_within_country_change
-FROM latest l
--- LEFT JOIN series    s USING (region)
-LEFT JOIN prev_year p USING (region)
-ORDER BY l.region;
+```sql municipalities_data
+select 
+  area_url as region_url,
+  area_name as region,
+  al_count,
+  inhabitants_per_al,
+  al_per_1000,
+  rank_within_country,
+  al_count_growth_pcnt,
+  rank_within_country_change
+from al_pulse.area_summary 
+where direct_parent_slug = '${params.id}' and admin_type = 'municipality'
 ```
 
+```sql localities_data  
+select 
+  area_url as region_url,
+  area_name as region,
+  al_count,
+  inhabitants_per_al,
+  al_per_1000,
+  rank_within_country,
+  al_count_growth_pcnt,
+  rank_within_country_change
+from al_pulse.area_summary 
+where (ancestor_region_slug = '${params.id}' or ancestor_municipality_slug = '${params.id}') 
+  and admin_type = 'locality'
+```
+
+{#if admin_info[0].admin_type == 'region'}
+<Tabs>
+  <Tab label="Municipalities">
+    <DataTable
+      title="Municipalities"
+      data={municipalities_data}  
+      rows="all"
+    >
+     <Column
+        id="region_url"
+        linkLabel=region
+        title="Municipality"
+        contentType=link  
+        />
+     <Column
+        id="al_count"
+        title="AL Count"
+        contentType=bar barColor=#aecfaf
+        />
+      <Column
+        id="al_count_growth_pcnt"
+        title="Growth last 3 years"
+        contentType=delta
+        fmt="pct"
+        />
+      <Column
+        id="inhabitants_per_al"
+        title="Inhabitants per AL"
+        scaleColumn=al_per_1000
+        contentType=colorscale colorScale=negative
+        />
+      <Column
+        id="rank_within_country"
+        title="Rank"
+        contentType=bar
+        />
+      <Column
+        id="rank_within_country_change"
+        title="Rank Change"
+        contentType=delta
+        />
+    </DataTable>
+  </Tab>
+  
+  <Tab label="Localities">
+    <DataTable
+      title="Localities"
+      data={localities_data}  
+      rows="all"
+    >
+     <Column
+        id="region_url"
+        linkLabel=region
+        title="Locality"
+        contentType=link  
+        />
+     <Column
+        id="al_count"
+        title="AL Count"
+        contentType=bar barColor=#aecfaf
+        />
+      <Column
+        id="al_count_growth_pcnt"
+        title="Growth last 3 years"
+        contentType=delta
+        fmt="pct"
+        />
+      <Column
+        id="inhabitants_per_al"
+        title="Inhabitants per AL"
+        scaleColumn=al_per_1000
+        contentType=colorscale colorScale=negative
+        />
+      <Column
+        id="rank_within_country"
+        title="Rank"
+        contentType=bar
+        />
+      <Column
+        id="rank_within_country_change"
+        title="Rank Change"
+        contentType=delta
+        />
+    </DataTable>
+  </Tab>
+</Tabs>
+
+{:else}
+<!-- For municipalities, only show localities (no tabs needed) -->
 <DataTable
-  title="Regions"
-  data={region_stats_series}  
+  title="Localities"
+  data={localities_data}  
   rows="all"
  >
  <Column
     id="region_url"
     linkLabel=region
-    title="Region"
+    title="Locality"
     contentType=link  
     />
  <Column
@@ -288,15 +420,12 @@ ORDER BY l.region;
     title="AL Count"
     contentType=bar barColor=#aecfaf
     />
-
   <Column
     id="al_count_growth_pcnt"
     title="Growth last 3 years"
     contentType=delta
     fmt="pct"
     />
-
-  
   <Column
     id="inhabitants_per_al"
     title="Inhabitants per AL"
@@ -313,9 +442,53 @@ ORDER BY l.region;
     title="Rank Change"
     contentType=delta
     />
-    
-
-
 </DataTable>
+{/if}
+
+{/if}
+
+{#if admin_info[0].admin_type!='locality'}
+
+```sql area_room_distribution
+select rdc.* from al_pulse.room_distribution_comparison rdc
+join admin a on rdc.area_id = a.osm_id
+where rdc.group_id = rdc.area_id 
+  and (
+    (a.region_slug = '${params.id}' and a.admin_type = 'municipality') or
+    (a.municipality_slug = '${params.id}' and a.admin_type = 'locality')
+  )
+```
+
+## Room Distribution Comparison
+
+{#if admin_info[0].admin_type == 'region'}
+<BarChart
+  title="Room Distribution Comparison by Municipality"
+  data={area_room_distribution}
+  x=name
+  y=value
+  series=metric_name
+  type=stacked100
+  swapXY=true
+  xAxisTitle="Municipality"
+  yAxisTitle="Percentage"
+  sort=false
+/>
+{/if}
+
+{#if admin_info[0].admin_type == 'municipality'}
+<BarChart
+  title="Room Distribution Comparison by Locality"
+  data={area_room_distribution}
+  x=name
+  y=value
+  series=metric_name
+  type=stacked100
+  swapXY=true
+  xAxisTitle="Locality"
+  yAxisTitle="Percentage"
+  sort=false
+/>
+{/if}
 
 {/if}

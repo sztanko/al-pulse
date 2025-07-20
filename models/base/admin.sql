@@ -112,6 +112,23 @@ result AS (
         ON a.osm_id = rp.osm_id
     LEFT JOIN parents_only AS pp
         ON a.osm_id = pp.parent_id
+),
+
+admin_with_hierarchy AS (
+    SELECT
+        a.*,
+        CASE
+            WHEN a.admin_type = 'locality' THEN parent.slug
+            WHEN a.admin_type = 'municipality' THEN a.slug
+        END AS municipality_slug,
+        CASE
+            WHEN a.admin_type = 'locality' THEN grandparent.slug
+            WHEN a.admin_type = 'municipality' THEN parent.slug
+            WHEN a.admin_type = 'region' THEN a.slug
+        END AS region_slug
+    FROM result AS a
+    LEFT JOIN result AS parent ON a.parent_id = parent.osm_id
+    LEFT JOIN result AS grandparent ON parent.parent_id = grandparent.osm_id
 )
 
-SELECT * FROM result
+SELECT * FROM admin_with_hierarchy

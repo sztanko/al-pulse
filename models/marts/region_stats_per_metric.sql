@@ -16,8 +16,7 @@ WITH base AS (
         -- municipality_name AS municipality,
         region_osm_id AS region,
         -- region_name AS region,
-        0 AS country,
-        is_building_post_1951
+        0 AS country
     FROM {{ ref('al') }}
     WHERE is_active = true
 ),
@@ -175,11 +174,11 @@ with_ranking AS (
         metric_name,
         value,
         cumulative_value,
-        percent_rank() OVER (
+        rank() OVER (
             PARTITION BY area_type, context_area_type, context_area_id, metric_name, year_month
             ORDER BY value DESC
         ) AS rank_month,
-        percent_rank() OVER (
+        rank() OVER (
             PARTITION BY area_type, context_area_type, context_area_id, metric_name, year_month
             ORDER BY cumulative_value DESC
         ) AS rank_cumulative
