@@ -54,6 +54,8 @@ You can then refer to those sources in md files in `reports/pages/`.
 
 You can read more about the Evidence.dev sources in the [Evidence.dev documentation](Their documentaion is here: https://docs.evidence.dev/components/all-components/).
 
+You can also check evidence_doc.md for more information on how to use Evidence.dev
+
 There are 3 pages right now:
 - `index.md`: Main page with overview of country-wide statistics
 - `[id].md`: Individual region, municipality and locality pages with detailed statistics

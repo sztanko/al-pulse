@@ -1,0 +1,1 @@
+select * from admin_stats_with_growth

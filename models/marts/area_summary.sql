@@ -74,5 +74,10 @@ SELECT
     (l.al_count - p.al_count_prev_year) / NULLIF(p.al_count_prev_year, 0) AS al_count_growth_pcnt,
     (p.rank_prev_year - l.rank_within_country) AS rank_within_country_change
 FROM latest AS l
-LEFT JOIN prev_year AS p USING (area_slug, direct_parent_slug, ancestor_municipality_slug, ancestor_region_slug)
+LEFT JOIN prev_year AS p ON (
+    l.area_slug = p.area_slug AND
+    COALESCE(l.direct_parent_slug, '') = COALESCE(p.direct_parent_slug, '') AND
+    COALESCE(l.ancestor_municipality_slug, '') = COALESCE(p.ancestor_municipality_slug, '') AND
+    COALESCE(l.ancestor_region_slug, '') = COALESCE(p.ancestor_region_slug, '')
+)
 ORDER BY l.ancestor_region_slug, l.ancestor_municipality_slug, l.area_name

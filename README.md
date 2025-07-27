@@ -39,3 +39,8 @@ Duckdb for data storage, Evidence.dev for data visualization, python for ETL. Co
   - number of abandoned buildings
   - population between 18 and 64
   - population over 65
+
+
+# Notes
+
+https://rnt.turismodeportugal.pt/RNT/RNAL.aspx?nr=24477 - this one doesn't load, because it is from 2005
