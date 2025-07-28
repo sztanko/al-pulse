@@ -215,6 +215,20 @@ join al_pulse.stats s_base on s.area_id=s_base.area_id and s_base.year_month = d
 
 order by a.ord, s.year_month
 ```
+
+```sql subareas_growth
+select 
+a.name as area_name,
+s.year_month,
+s.cumulative_value_c / nullif(s_base.cumulative_value_c, 0) as growth_since_base
+from al_pulse.stats s
+join admin a on a.osm_id=s.area_id
+join admin a_parent on a.parent_id=a_parent.osm_id
+join al_pulse.stats s_base on s.area_id=s_base.area_id and s_base.year_month = date_trunc('month', current_date + interval '1 month' * ${inputs.base_date})
+where a_parent.slug='${params.id}'
+order by a.name, s.year_month
+```
+
 ### Growth compared to { new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })}
   
 <Slider
@@ -227,7 +241,45 @@ title="Month offset for growth calculation base"
     showMaxMin=false
 /> 
 
-
+{#if admin_info[0].admin_type!='locality'}
+<Tabs>
+  <Tab label="Area Growth">
+    <LineChart
+      title="100% is { new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })}"
+      data={monthly_growth}
+      series="area_name"
+      y="growth_since_base"
+      x="year_month"
+      yField="value"
+      yFmt="pct"
+      >
+      <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
+      <ReferencePoint 
+      x={ new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date)))} 
+      y=1 label={ new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })} labelPosition=bottom color=base-content-muted/>
+        
+      </LineChart>
+  </Tab>
+  
+  <Tab label="Subareas Comparison">
+    <LineChart
+      title="Subareas Growth - 100% is { new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })}"
+      data={subareas_growth}
+      series="area_name"
+      y="growth_since_base"
+      x="year_month"
+      yField="value"
+      yFmt="pct"
+      >
+      <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
+      <ReferencePoint 
+      x={ new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date)))} 
+      y=1 label={ new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })} labelPosition=bottom color=base-content-muted/>
+        
+      </LineChart>
+  </Tab>
+</Tabs>
+{:else}
 <LineChart
   title="100% is { new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })}"
   data={monthly_growth}
@@ -243,6 +295,7 @@ title="Month offset for growth calculation base"
   y=1 label={ new Date(new Date().setMonth(new Date().getMonth() -  -(inputs.base_date))).toLocaleString('en-US', { month: 'long', year: 'numeric' })} labelPosition=bottom color=base-content-muted/>
     
   </LineChart>
+{/if}
 
  
 
