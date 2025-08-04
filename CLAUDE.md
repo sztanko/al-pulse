@@ -25,6 +25,13 @@ Key marts include:
 - `region_stats_per_metric.sql`: Aggregated statistics by area and metric
 - `localities_with_data_for_geojson.sql`: Geospatial data for mapping
 
+## Best practices
+
+- Do not create complex sql in the reports, as it will be hard to maintain. Instead, create a dbt model and refer to it in the report.
+- Use descriptive names for models and fields to ensure clarity
+- For python scripts, use `typer` as the CLI framework for better usability
+- also make sure the python logic is split in functions with well defined responsibilities
+
 ## Essential Commands
 
 ### Data Pipeline
