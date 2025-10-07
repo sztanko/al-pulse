@@ -1,4 +1,5 @@
 import requests
+import urllib3
 from bs4 import BeautifulSoup
 from typing import Optional, Dict
 import logging
@@ -8,6 +9,9 @@ from tenacity import (
     retry_if_exception_type,
     wait_random_exponential,
 )
+
+# Disable SSL warnings when ignoring certificate verification
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -37,7 +41,7 @@ def lookup_postcode(postcode: str) -> Optional[Dict[str, str]]:
 
     url = f"https://www.codigo-postal.pt/?cp4={cp4}&cp3={cp3}"
     log.info(f"Requesting URL: {url}")
-    resp = requests.get(url, timeout=10)
+    resp = requests.get(url, timeout=10, verify=False)
 
     if not resp.ok:
         log.warning("Failed to fetch page")
