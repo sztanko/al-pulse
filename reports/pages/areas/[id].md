@@ -172,7 +172,7 @@ order by s.year_month
 ```
 
 <LineChart
-  title="Monthly Stats"
+  title="New and Total AL Registrations"
   data={monthly_stats_c}
   y="total"
   y2="new_rentals"
@@ -183,6 +183,58 @@ order by s.year_month
   <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
   </LineChart>
 
+```sql lost_licenses_stats
+select
+  sum(case when year_month = date_trunc('month', current_date) then value_lost_licenses else 0 end) as last_month_lost,
+  sum(case when year(year_month) = year(current_date) then value_lost_licenses else 0 end) as ytd_lost,
+  sum(case when year(year_month) = year(current_date) - 1 then value_lost_licenses else 0 end) as last_year_total
+from al_pulse.stats s
+join admin a on a.osm_id=s.area_id
+where a.slug='${params.id}'
+```
+
+## Lost Licenses
+
+<Grid cols=2>
+<BigValue
+  title="Lost Licenses Last Month"
+  data={lost_licenses_stats}
+  value=last_month_lost
+  fmt="num0"
+  description="Number of AL licenses lost in the most recent month in this area"
+  />
+<BigValue
+  title="Lost Licenses Year-to-Date"
+  data={lost_licenses_stats}
+  value=ytd_lost
+  fmt="num0"
+  description="Total number of AL licenses lost this year in this area"
+  />
+</Grid>
+
+```sql lost_licenses_monthly
+select
+  s.year_month,
+  s.value_lost_licenses as monthly_lost,
+  s.cumulative_value_lost_licenses as total_lost
+from al_pulse.stats s
+join admin a on a.osm_id=s.area_id
+where a.slug='${params.id}' and s.value_lost_licenses > 0
+order by s.year_month
+```
+
+<LineChart
+  title="Lost Licenses Over Time"
+  data={lost_licenses_monthly}
+  x="year_month"
+  y="total_lost"
+  y2="monthly_lost"
+  y2SeriesType=bar
+  xAxisTitle="Month"
+  yAxisTitle="Number of Lost Licenses"
+>
+  <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
+</LineChart>
 
 ```sql monthly_growth
 with area_hierarchy as (

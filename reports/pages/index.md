@@ -9,6 +9,15 @@ hide_breadcrumbs: true
 select max(cumulative_value_c) as num_al from al_pulse.stats where area_id=0
 ```
 
+```sql lost_licenses_stats
+select
+  sum(case when year_month = date_trunc('month', current_date) then value_lost_licenses else 0 end) as last_month_lost,
+  sum(case when year(year_month) = year(current_date) then value_lost_licenses else 0 end) as ytd_lost,
+  sum(case when year(year_month) = year(current_date) - 1 then value_lost_licenses else 0 end) as last_year_total
+from al_pulse.stats
+where area_id=0
+```
+
 ```sql skew
 select * from al_pulse.distribution_skew where slug='portugal' and threshold='50'
 ```
@@ -46,7 +55,7 @@ order by year_month
 ```
 
 <LineChart
-  title="Monthly Stats"
+  title="New and Total AL Registrations"
   data={monthly_stats_c}
   y="total"
   y2="new_rentals"
@@ -56,6 +65,48 @@ order by year_month
   >
   <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
   </LineChart>
+
+## Lost Licenses
+
+<Grid cols=2>
+<BigValue
+  title="Lost Licenses Last Month"
+  data={lost_licenses_stats}
+  value=last_month_lost
+  fmt="num0"
+  description="Number of AL licenses lost in the most recent month"
+  />
+<BigValue
+  title="Lost Licenses Year-to-Date"
+  data={lost_licenses_stats}
+  value=ytd_lost
+  fmt="num0"
+  description="Total number of AL licenses lost this year"
+  />
+</Grid>
+
+```sql lost_licenses_monthly
+select
+  year_month,
+  value_lost_licenses as monthly_lost,
+  cumulative_value_lost_licenses as total_lost
+from al_pulse.stats
+where area_id=0 and value_lost_licenses > 0
+order by year_month
+```
+
+<LineChart
+  title="Lost Licenses Over Time"
+  data={lost_licenses_monthly}
+  x="year_month"
+  y="total_lost"
+  y2="monthly_lost"
+  y2SeriesType=bar
+  xAxisTitle="Month"
+  yAxisTitle="Number of Lost Licenses"
+>
+  <ReferenceLine data={timeline} x=event_date label=event_name hideValue/>
+</LineChart>
 
 ```sql region_stats_series
 select 

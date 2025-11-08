@@ -1,11 +1,7 @@
 name: Monthly Data Refresh
 
 on:
-  # Run on the first day of every month at 3am UTC
-  schedule:
-    - cron: '0 3 1 * *'
-
-  # Allow manual trigger for testing
+  # Manual trigger only (automatic schedule disabled - run scripts/monthly_data_refresh.sh locally instead)
   workflow_dispatch:
 
 # Permissions needed to commit and push changes

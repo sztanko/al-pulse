@@ -21,7 +21,7 @@ on-run-start: # SQL statements to run at the start of a dbt run
   - SET preserve_insertion_order = FALSE
   - SET memory_limit = '6GB'
   - PRAGMA temp_directory = '/tmp'
-  - PRAGMA max_temp_directory_size = '10GB'
+  - PRAGMA max_temp_directory_size = '20GB'
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 
@@ -58,4 +58,5 @@ vars:
     rooms_more_than_3: pcnt
     is_moradia: pcnt
     is_apartamento: pcnt
+    lost_licenses: normal
 

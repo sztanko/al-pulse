@@ -31,6 +31,41 @@ WITH base AS (
     ['country', 'country'],
 ] %}
 
+grouped_lost_licenses AS (
+    {% for p in area_groups %}
+        SELECT
+            '{{ p[0] }}' AS area_type,
+            '{{ p[1] }}' AS context_area_type,
+            {% if p[0] == 'country' %}
+                cast(0 AS BIGINT)
+            {% else %}
+                {{ p[0] }}_osm_id
+            {% endif %} AS area_id,
+            {% if p[1] == 'country' %}
+                cast(0 AS BIGINT)
+            {% else %}
+                {{ p[1] }}_osm_id
+            {% endif %} AS context_area_id,
+            lost_in_year_month AS year_month,
+            count(*) AS lost_licenses
+        FROM {{ ref('int_lost_licenses_mapped') }}
+        {% if p[0] != 'country' or p[1] != 'country' %}
+        WHERE
+            {% if p[0] != 'country' %}
+                {{ p[0] }}_osm_id IS NOT NULL
+            {% endif %}
+            {% if p[0] != 'country' and p[1] != 'country' %}
+                AND
+            {% endif %}
+            {% if p[1] != 'country' %}
+                {{ p[1] }}_osm_id IS NOT NULL
+            {% endif %}
+        {% endif %}
+        GROUP BY area_id, context_area_id, lost_in_year_month
+        {% if not loop.last -%}UNION ALL{%- endif -%}
+    {%- endfor -%}
+),
+
 data_points AS (
     {% for p in area_groups %}
         SELECT
@@ -116,7 +151,8 @@ all_rows AS (
         coalesce(g.rooms_3, 0) AS rooms_3,
         coalesce(g.rooms_more_than_3, 0) AS rooms_more_than_3,
         coalesce(g.is_moradia, 0) AS is_moradia,
-        coalesce(g.is_apartamento, 0) AS is_apartamento
+        coalesce(g.is_apartamento, 0) AS is_apartamento,
+        coalesce(ll.lost_licenses, 0) AS lost_licenses
     FROM distinct_areas AS a
     CROSS JOIN distinct_year_months AS y
     LEFT JOIN grouped_data AS g
@@ -126,6 +162,13 @@ all_rows AS (
             AND a.area_id = g.area_id
             AND a.context_area_id = g.context_area_id
             AND y.year_month = g.year_month
+    LEFT JOIN grouped_lost_licenses AS ll
+        ON
+            a.area_type = ll.area_type
+            AND a.context_area_type = ll.context_area_type
+            AND a.area_id = ll.area_id
+            AND a.context_area_id = ll.context_area_id
+            AND y.year_month = ll.year_month
 
 ),
 
