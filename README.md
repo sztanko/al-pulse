@@ -1,46 +1,176 @@
-# Definition
+# AL Pulse
 
-Analysis of Portuguese AL (Alojamento Local) data. Focus on historical growth, spatial distribution, top 10 X (e.g. most growing postcodes/freguesias, places where AL is wlosing down, etc.), and comparison with census data. We need to see how many AL-s per 1000 residents are there, etc.
+An open-source geospatial data analysis project tracking Portuguese Alojamento Local (AL) accommodation listings across Portugal. This project analyzes historical growth, spatial distribution, and demographic impacts of short-term rental properties using modern data engineering tools.
 
-## Sources
-- Portugal OSM: https://download.geofabrik.de/europe/portugal-latest.osm.pbf - here is a tutorial: https://towardsdatascience.com/how-to-read-osm-data-with-duckdb-ffeb15197390/
-- admin areas: https://dados.gov.pt/en/datasets/distritos-de-portugal/ and https://dados.gov.pt/en/datasets/freguesias-de-portugal/ 
-- postcode data: https://raw.githubusercontent.com/temospena/CP7/refs/heads/master/CP7%20Portugal/CP7_Portugal_nov2022.txt
-- census data: https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&lang=PT&varcd=0011609
-- al data: https://rnt.turismodeportugal.pt/RNT/Pesquisa_AL.aspx
-  - al data for azores: https://www.azores.gov.pt/NR/rdonlyres/F5B6CDB9-24D1-4EE9-8AB2-1D5B141A21DE/0/ALDRT27022018smg.pdf
-  - see info: https://portal.azores.gov.pt/web/drturismo/alojamento-local
-  - https://www.azores.gov.pt/Portal/pt/entidades/sreat-drturismo/livres/aloj-local3.htm - list of ALs in Azores, found here: https://business.turismodeportugal.pt/SiteCollectionDocuments/alojamento-local/guia-alojamento-local-jan-2025.pdf?
+## Live Reports
 
-Btw, nice AL mapping visualization: https://dadosabertos.turismodeportugal.pt/datasets/4e62eb1977564991bd01e61d7aa8266f_6/explore?location=39.567599%2C-8.411836%2C12.89
-https://dadosabertos.turismodeportugal.pt/datasets/4e62eb1977564991bd01e61d7aa8266f_6/explore?location=38.706161%2C-8.988947%2C14.03
-## Tools
+View the interactive reports at: [https://your-username.github.io/al-pulse](https://your-username.github.io/al-pulse) *(update with your actual GitHub Pages URL)*
 
-Duckdb for data storage, Evidence.dev for data visualization, python for ETL. Consider using DBT for models.
+## What It Does
 
-## Actions
+AL Pulse provides:
 
-### Build base data
+- **Historical Analysis**: Track AL listing growth from 2007 to present across Portugal
+- **Geographic Insights**: Visualize AL distribution at country, district, municipality, and locality (freguesia) levels
+- **Demographic Context**: Calculate AL density per capita and analyze impacts on local communities
+- **Growth Tracking**: Identify fastest-growing and declining areas
+- **Property Analytics**: Analyze room counts, building ages, and property types
+- **Interactive Maps**: Explore geospatial data through Evidence.dev visualizations
 
-- postcode areas
-  - voronoi polygons of postcodes
-  - intersect with
-    - frequesia boundaries
-    - buffer roads, residential areas, and buildings
-      - buffer + 100m, then -50m (which means we need to find a good projection for the data. Remember, this also includes Azoresa and Madeira, so we need to use a projection that works well for the whole country)
-        - EPSG:3763 for mainland Portugal, but also for Azores and Madeira. Just for reference, there are usland specific projections, which we won't use:
-          - UTM zone 26N for Azores for Azores
-          - UTM 28N for Madeira
-  - 
-- census data, get the data for 2021. For each freqguesia, get:
-  - population
-  - number of households
-  - number of dwellings
-  - number of abandoned buildings
-  - population between 18 and 64
-  - population over 65
+The project focuses on mainland Portugal and Madeira (Azores data is excluded due to infrequent updates).
 
+## Architecture
 
-# Notes
+- **Data Storage**: DuckDB with spatial extension
+- **Data Modeling**: DBT (staging → intermediate → marts layers)
+- **Visualization**: Evidence.dev for interactive reports
+- **ETL**: Python scripts with Playwright for web scraping
+- **Deployment**: GitHub Pages (automated via GitHub Actions)
 
-https://rnt.turismodeportugal.pt/RNT/RNAL.aspx?nr=24477 - this one doesn't load, because it is from 2005
+## Data Sources
+
+- **AL Listings**: [Turismo de Portugal RNT](https://rnt.turismodeportugal.pt/RNT/Pesquisa_AL.aspx)
+- **Administrative Boundaries**: [OpenStreetMap](https://download.geofabrik.de/europe/portugal-latest.osm.pbf)
+- **Postal Codes**: [CP7 Portugal](https://github.com/temospena/CP7)
+- **Census Data**: [INE Portugal](https://www.ine.pt/)
+
+All raw data is stored in compressed CSV format in the repository and processed through DBT models to create structured datasets.
+
+## Development Setup
+
+### Prerequisites
+
+- Python 3.13+
+- DuckDB 1.1.3+
+- Node.js 22+
+- Playwright (for web scraping)
+
+### Installation
+
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Install Playwright browsers
+playwright install webkit
+
+# Install Evidence.dev dependencies
+cd reports
+npm install
+cd ..
+```
+
+### Running the Pipeline
+
+```bash
+# 1. Load and process data (using existing CSV files)
+./scripts/run_etl.sh
+
+# 2. Generate reports
+./scripts/run_report.sh
+
+# 3. View reports locally
+cd reports
+npm run dev
+```
+
+## Monthly Data Updates
+
+This project requires manual data updates on the 1st of each month.
+
+### Update Process
+
+Run the monthly update script:
+
+```bash
+./scripts/monthly_data_refresh.sh
+```
+
+This script will:
+1. Fetch new AL data (~1 hour runtime)
+2. Process data through the ETL pipeline
+3. Stage changes to git
+4. Prompt for confirmation
+5. Commit and push to GitHub
+
+Once pushed, GitHub Actions automatically:
+- Runs the full ETL pipeline
+- Builds Evidence.dev reports
+- Deploys to GitHub Pages
+
+### Set Up Monthly Reminders
+
+**macOS/Linux Calendar Notification:**
+
+Add to crontab (`crontab -e`):
+```bash
+0 9 1 * * /usr/bin/osascript -e 'display notification "Run monthly AL data refresh" with title "AL Pulse"'
+```
+
+**Manual Calendar Event:**
+
+Create a recurring monthly calendar event on the 1st to run `./scripts/monthly_data_refresh.sh`
+
+## Project Structure
+
+```
+├── data/                      # DuckDB database (not committed)
+├── downloads/                 # Raw data (CSV.gz files, committed)
+│   ├── al/                   # AL listing data
+│   ├── postal_code/          # Postal code data
+│   └── osm/                  # OSM boundaries
+├── models/                    # DBT models
+│   ├── staging/              # Initial data cleaning
+│   ├── intermediate/         # Complex transformations
+│   └── marts/                # Final analysis tables
+├── reports/                   # Evidence.dev reports
+│   ├── pages/                # Report pages (index, areas, map)
+│   └── sources/              # Data source definitions
+├── scripts/                   # ETL and utility scripts
+└── .github/workflows/        # GitHub Actions
+```
+
+## Key Commands
+
+```bash
+# DBT operations
+dbt seed                      # Load seed data
+dbt run                       # Run all models
+dbt test                      # Run data quality tests
+dbt run --select <model>      # Run specific model
+
+# Evidence.dev operations
+cd reports
+npm run sources               # Regenerate data sources
+npm run dev                   # Development server
+npm run build                 # Production build
+
+# Database access
+duckdb data/prod.duckdb       # Connect to database
+```
+
+## Configuration
+
+- `dbt_project.yml`: DBT configuration and materialization strategies
+- `config/profiles.yml`: DuckDB connection with spatial extension
+- `reports/evidence.config.yaml`: Evidence.dev theming and deployment settings
+- `CLAUDE.md`: AI assistant guidance for working with this codebase
+
+## Contributing
+
+This is an open-source project. Contributions are welcome! The data and code are freely available for analysis and research.
+
+### Development Notes
+
+- Use EPSG:3763 projection for all spatial operations
+- Follow DBT best practices: staging → intermediate → marts
+- Avoid complex SQL in reports; create DBT models instead
+- Use descriptive names for models and fields
+- Use `typer` for Python CLI scripts
+
+## References
+
+- Official AL mapping: [Turismo de Portugal Open Data](https://dadosabertos.turismodeportugal.pt/datasets/4e62eb1977564991bd01e61d7aa8266f_6/explore)
+- DBT Documentation: [docs.getdbt.com](https://docs.getdbt.com)
+- Evidence.dev Documentation: [docs.evidence.dev](https://docs.evidence.dev)
+- DuckDB Spatial: [duckdb.org/docs/extensions/spatial](https://duckdb.org/docs/extensions/spatial)
