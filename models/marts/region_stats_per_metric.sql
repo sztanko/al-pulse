@@ -1,4 +1,5 @@
 WITH base AS (
+    -- Count ALL registrations per month (not just currently active)
     SELECT
         al_id,
         registration_number,
@@ -18,7 +19,7 @@ WITH base AS (
         -- region_name AS region,
         0 AS country
     FROM {{ ref('al') }}
-    WHERE is_active = true
+    -- Removed WHERE is_active = true to count ALL registrations
 ),
 
 {% set area_groups = [
@@ -172,7 +173,7 @@ all_rows AS (
 
 ),
 
-with_cumulative AS (
+with_cumulative_base AS (
     {% for metric, agg in var('metrics').items() %}
 
         SELECT
@@ -201,10 +202,36 @@ with_cumulative AS (
                     PARTITION BY area_type, context_area_type, area_id, context_area_id
                     ORDER BY year_month
                 ), 0)
-            {% endif %} AS cumulative_value
+            {% endif %} AS cumulative_value_raw
         FROM all_rows
         {% if not loop.last -%}UNION ALL{%- endif -%}
     {% endfor %}
+),
+
+with_cumulative AS (
+    -- For metric 'c', adjust cumulative to be: registrations - lost_licenses
+    SELECT
+        c.area_type,
+        c.context_area_type,
+        c.year_month,
+        c.area_id,
+        c.context_area_id,
+        c.metric_name,
+        c.value,
+        CASE
+            WHEN c.metric_name = 'c' THEN
+                c.cumulative_value_raw - coalesce(ll.cumulative_value_raw, 0)
+            ELSE
+                c.cumulative_value_raw
+        END AS cumulative_value
+    FROM with_cumulative_base AS c
+    LEFT JOIN with_cumulative_base AS ll
+        ON c.area_type = ll.area_type
+        AND c.context_area_type = ll.context_area_type
+        AND c.area_id = ll.area_id
+        AND c.context_area_id = ll.context_area_id
+        AND c.year_month = ll.year_month
+        AND ll.metric_name = 'lost_licenses'
 ),
 
 with_ranking AS (
