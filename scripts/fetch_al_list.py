@@ -12,6 +12,7 @@ from tenacity import (
     stop_after_attempt,
     retry_if_exception_type,
     wait_random_exponential,
+    before_sleep_log,
 )
 
 # ---- Constants ----
@@ -22,7 +23,7 @@ EXPORT_LINK_TEXT = "Exportar detalhe registos"
 DOWNLOAD_DIR = Path.cwd() / "downloads"
 TEMP_FILENAME = "al_data.xlsx"
 FIRST_DATE = "2007-01-01"
-TIMEOUT_SECONDS = 7
+TIMEOUT_SECONDS = 30
 OUTPUT_CSV = f"{DOWNLOAD_DIR}/al/al_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
 # ---- Logging ----
@@ -69,6 +70,7 @@ def append_excel_to_csv(
     stop=stop_after_attempt(10),
     wait=wait_random_exponential(multiplier=2, min=3, max=60),
     retry=retry_if_exception_type(Exception),
+    before_sleep=before_sleep_log(log, logging.WARNING),
     reraise=True,
 )
 def fetch_and_export(
