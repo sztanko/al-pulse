@@ -89,15 +89,16 @@ def fetch_and_export(
 
     page.locator(SEARCH_BUTTON_SELECTOR).click()
 
-    # Wait for export link to appear (up to TIMEOUT_SECONDS), or determine no data exists
-    if not page.locator(f"a:has-text('{EXPORT_LINK_TEXT}')").is_visible(
-        timeout=TIMEOUT_SECONDS * 1000
-    ):
+    # Wait for export link to appear (up to TIMEOUT_SECONDS)
+    export_link = page.locator(f"a:has-text('{EXPORT_LINK_TEXT}')")
+    try:
+        export_link.wait_for(state="visible", timeout=TIMEOUT_SECONDS * 1000)
+    except Exception:
         log.warning(f"No data to export")
         return
 
     with page.expect_download() as download_info:
-        page.locator(f"a:has-text('{EXPORT_LINK_TEXT}')").click()
+        export_link.click()
     download = download_info.value
 
     DOWNLOAD_DIR.mkdir(exist_ok=True)
