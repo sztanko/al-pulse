@@ -23,7 +23,7 @@ EXPORT_LINK_TEXT = "Exportar detalhe registos"
 DOWNLOAD_DIR = Path.cwd() / "downloads"
 TEMP_FILENAME = "al_data.xlsx"
 FIRST_DATE = "2007-01-01"
-TIMEOUT_SECONDS = 30
+TIMEOUT_SECONDS = 120
 OUTPUT_CSV = f"{DOWNLOAD_DIR}/al/al_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
 # ---- Logging ----
@@ -68,7 +68,7 @@ def append_excel_to_csv(
 
 @retry(
     stop=stop_after_attempt(10),
-    wait=wait_random_exponential(multiplier=2, min=3, max=60),
+    wait=wait_random_exponential(multiplier=2, min=3, max=120),
     retry=retry_if_exception_type(Exception),
     before_sleep=before_sleep_log(log, logging.WARNING),
     reraise=True,
@@ -88,8 +88,8 @@ def fetch_and_export(
     date_inputs.nth(1).fill(to_date)
 
     page.locator(SEARCH_BUTTON_SELECTOR).click()
-    page.wait_for_timeout(TIMEOUT_SECONDS * 1000)
 
+    # Wait for export link to appear (up to TIMEOUT_SECONDS), or determine no data exists
     if not page.locator(f"a:has-text('{EXPORT_LINK_TEXT}')").is_visible(
         timeout=TIMEOUT_SECONDS * 1000
     ):
@@ -131,12 +131,14 @@ def run_per_month(
 
     with sync_playwright() as p:
         browser = p.webkit.launch(headless=True)
-        context = browser.new_context(accept_downloads=True)
-        page = context.new_page()
 
         current = start_date
         write_header = True
         while current <= end_date:
+            # Create fresh context and page for each month to avoid session-based blocking
+            context = browser.new_context(accept_downloads=True)
+            page = context.new_page()
+
             next_month = (current.month % 12) + 1
             next_year = current.year + (current.month // 12)
             last_day = (datetime(next_year, next_month, 1) - timedelta(days=1)).day
@@ -153,6 +155,11 @@ def run_per_month(
                 ts=ts,
             )
             write_header = False
+
+            # Clean up context after each month
+            context.close()
+
+            time.sleep(5)  # Wait 5 seconds before next month to avoid rate limiting
             current = month_end + timedelta(days=1)
 
         browser.close()
