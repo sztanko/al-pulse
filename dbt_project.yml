@@ -19,8 +19,8 @@ clean-targets: # directories to be removed by `dbt clean`
 on-run-start: # SQL statements to run at the start of a dbt run
   - "{{ register_macros() }}"
   - SET preserve_insertion_order = FALSE
-  - SET memory_limit = '6GB'
-  - PRAGMA temp_directory = '/tmp'
+  - SET memory_limit = '4GB'
+  - PRAGMA temp_directory = 'data/duckdb_tmp'
   - PRAGMA max_temp_directory_size = '20GB'
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
