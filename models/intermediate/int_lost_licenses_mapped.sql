@@ -8,7 +8,16 @@
 -- Uses the same mapping logic as the al model
 
 WITH lost_licenses AS (
-    SELECT * FROM {{ ref('int_lost_licenses') }}
+    -- real_postcode is resolved here for the same reason al_unmapped resolves
+    -- it: a listing's raw postal_code is often wrong, and `postcodes` carries
+    -- the corrected value. Mapping a lost licence by its raw postcode while
+    -- the al model maps the same listing by its corrected one is what let a
+    -- licence be subtracted from a locality that never counted it.
+    SELECT
+        ll.*,
+        ps.real_postcode
+    FROM {{ ref('int_lost_licenses') }} AS ll
+    LEFT JOIN {{ ref('postcodes') }} AS ps ON ll.postal_code = ps.postcode
 ),
 
 name_mapping AS (
@@ -36,8 +45,8 @@ postcode_mapping AS (
     LEFT JOIN
         {{ ref('postcodes') }}
             AS p
-        ON ll.postal_code = p.postcode
-    LEFT JOIN {{ ref('invalid_postcode_similarities') }} AS ips ON ll.postal_code = ips.postcode
+        ON ll.real_postcode = p.postcode
+    LEFT JOIN {{ ref('invalid_postcode_similarities') }} AS ips ON ll.real_postcode = ips.postcode
 ),
 
 consolidated_mapping AS (
