@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime, timedelta
 from calendar import monthrange
+import re
 import time
 import csv
 import logging
@@ -19,7 +20,15 @@ from tenacity import (
 URL = "https://rnt.turismodeportugal.pt/RNT/Pesquisa_AL.aspx"
 DATE_INPUT_SELECTOR = "input[placeholder='AAAA-MM-DD']"
 SEARCH_BUTTON_SELECTOR = "input[value='Pesquisar']"
-EXPORT_LINK_TEXT = "Exportar detalhe registos"
+# The export control used to read "Exportar detalhe registos". It is now an
+# icon plus <span>&nbsp;Exportar</span>, so its textContent is "\xa0Exportar"
+# and any exact-text match (:text-is, get_by_role(exact=True)) returns nothing.
+# Matching on the __doPostBack href as well avoids depending on the OutSystems
+# generated id (RichWidgets_wt45_block_wtMainContent_wt110), which changes
+# whenever they redeploy.
+EXPORT_LINK_SELECTOR = "a[href*='__doPostBack']:has-text('Exportar')"
+# "1 a 10 de 607 registos" on the results page.
+RESULT_COUNT_RE = re.compile(r"de\s*([\d\s.,\xa0]+?)\s*registos", re.IGNORECASE)
 DOWNLOAD_DIR = Path.cwd() / "downloads"
 TEMP_FILENAME = "al_data.xlsx"
 FIRST_DATE = "2007-01-01"
@@ -66,6 +75,23 @@ def append_excel_to_csv(
     return count_writes
 
 
+def result_count(page) -> int | None:
+    """Records the results page claims to have found, or None if it says nothing.
+
+    Used to tell "this month genuinely has no registrations" apart from "we
+    failed to find the export control".
+    """
+    try:
+        body = page.locator("body").inner_text()
+    except Exception:
+        return None
+    match = RESULT_COUNT_RE.search(body)
+    if not match:
+        return None
+    digits = re.sub(r"\D", "", match.group(1))
+    return int(digits) if digits else None
+
+
 @retry(
     stop=stop_after_attempt(10),
     wait=wait_random_exponential(multiplier=2, min=3, max=120),
@@ -90,11 +116,23 @@ def fetch_and_export(
     page.locator(SEARCH_BUTTON_SELECTOR).click()
 
     # Wait for export link to appear (up to TIMEOUT_SECONDS)
-    export_link = page.locator(f"a:has-text('{EXPORT_LINK_TEXT}')")
+    export_link = page.locator(EXPORT_LINK_SELECTOR)
     try:
         export_link.wait_for(state="visible", timeout=TIMEOUT_SECONDS * 1000)
     except Exception:
-        log.warning(f"No data to export")
+        # A month with no registrations legitimately has no export control. But
+        # so does a month whose export control we simply failed to match, and
+        # treating the two alike is how a stale selector silently produced empty
+        # exports for months on end. Only stay quiet when the page itself says
+        # there is nothing to export.
+        found = result_count(page)
+        if found:
+            raise RuntimeError(
+                f"{from_date}..{to_date}: page reports {found} registos but no "
+                f"export link matched {EXPORT_LINK_SELECTOR!r} — the site's "
+                f"markup has probably changed again"
+            )
+        log.warning(f"No data to export for {from_date}..{to_date}")
         return
 
     with page.expect_download() as download_info:
@@ -131,7 +169,13 @@ def run_per_month(
         output.unlink()  # Clean existing file
 
     with sync_playwright() as p:
-        browser = p.webkit.launch(headless=True)
+        # Chromium, not webkit. The export response carries
+        # "Content-Disposition: attachment" but also "Content-Type: text/csv"
+        # while the body is actually an xlsx (a PK zip). Webkit believes the
+        # content-type, renders the binary into the page as text and never
+        # emits a download event, so expect_download times out. Chromium
+        # honours the disposition and downloads the file.
+        browser = p.chromium.launch(headless=True)
 
         current = start_date
         write_header = True
