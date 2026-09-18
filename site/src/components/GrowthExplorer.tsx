@@ -103,9 +103,13 @@ export default function GrowthExplorer({
     return { drawn: out, lo: Math.max(0, mn - pad), hi: mx + pad };
   }, [active, baseIdx]);
 
+  // The axis spans the drawn window, not the whole series. Mapping over all
+  // 177 months while only the post-base months carry values left most of the
+  // plot empty and squeezed the part being compared into the right-hand edge.
+  const span = Math.max(1, n - 1 - baseIdx);
   const x = useCallback(
-    (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * innerW),
-    [n, innerW]
+    (i: number) => ((i - baseIdx) / span) * innerW,
+    [baseIdx, span, innerW]
   );
   const y = useCallback(
     (v: number) => innerH - ((v - lo) / (hi - lo || 1)) * innerH,
@@ -133,15 +137,23 @@ export default function GrowthExplorer({
     return out;
   }, [lo, hi]);
 
+  /** One tick per year in the drawn window. Stepping by a fixed index and
+   * labelling the year printed the same year twice whenever the step landed in
+   * it more than once. */
   const xTicks = useMemo(() => {
-    const out: { i: number; text: string }[] = [];
-    const want = narrow ? 4 : 7;
-    const step = Math.max(1, Math.round((n - baseIdx) / want));
-    for (let i = baseIdx; i < n; i += step) {
-      const m = months[i];
-      if (m) out.push({ i, text: m.slice(0, 4) });
+    const seen = new Set<string>();
+    const years: { i: number; text: string }[] = [];
+    for (let i = baseIdx; i < n; i++) {
+      const y = months[i]?.slice(0, 4);
+      if (!y || seen.has(y)) continue;
+      seen.add(y);
+      years.push({ i, text: y });
     }
-    return out;
+    // Thin them if the window is long or the screen is narrow.
+    const want = narrow ? 5 : 9;
+    if (years.length <= want) return years;
+    const every = Math.ceil(years.length / want);
+    return years.filter((_, k) => k % every === 0);
   }, [n, baseIdx, months, narrow]);
 
   const eventIdx = useMemo(
@@ -158,10 +170,11 @@ export default function GrowthExplorer({
       if (!svg) return null;
       const r = svg.getBoundingClientRect();
       const px = clientX - r.left - PAD.left;
-      const i = Math.round((px / innerW) * (n - 1));
+      // Inverse of x(): the axis runs from the base month, not from month 0.
+      const i = baseIdx + Math.round((px / innerW) * span);
       return Math.max(baseIdx, Math.min(n - 1, i));
     },
-    [innerW, n, baseIdx]
+    [innerW, n, baseIdx, span]
   );
 
   useEffect(() => {
