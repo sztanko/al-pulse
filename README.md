@@ -15,7 +15,7 @@ AL Pulse provides:
 - **Demographic Context**: Calculate AL density per capita and analyze impacts on local communities
 - **Growth Tracking**: Identify fastest-growing and declining areas
 - **Property Analytics**: Analyze room counts, building ages, and property types
-- **Interactive Maps**: Explore geospatial data through Evidence.dev visualizations
+- **Interactive Maps**: Explore geospatial data through the static site visualizations
 
 The project focuses on mainland Portugal and Madeira (Azores data is excluded due to infrequent updates).
 
@@ -23,7 +23,7 @@ The project focuses on mainland Portugal and Madeira (Azores data is excluded du
 
 - **Data Storage**: DuckDB with spatial extension
 - **Data Modeling**: DBT (staging → intermediate → marts layers)
-- **Visualization**: Evidence.dev for interactive reports
+- **Visualization**: the static site for interactive reports
 - **ETL**: Python scripts with Playwright for web scraping
 - **Deployment**: GitHub Pages (automated via GitHub Actions)
 
@@ -54,7 +54,7 @@ pip install -r requirements.txt
 # Install Playwright browsers
 playwright install webkit
 
-# Install Evidence.dev dependencies
+# Install the static site dependencies
 cd reports
 npm install
 cd ..
@@ -95,7 +95,7 @@ This script will:
 
 Once pushed, GitHub Actions automatically:
 - Runs the full ETL pipeline
-- Builds Evidence.dev reports
+- Builds the static site reports
 - Deploys to GitHub Pages
 
 ### Set Up Monthly Reminders
@@ -123,9 +123,11 @@ Create a recurring monthly calendar event on the 1st to run `./scripts/monthly_d
 │   ├── staging/              # Initial data cleaning
 │   ├── intermediate/         # Complex transformations
 │   └── marts/                # Final analysis tables
-├── reports/                   # Evidence.dev reports
-│   ├── pages/                # Report pages (index, areas, map)
-│   └── sources/              # Data source definitions
+├── site/                      # the static site (Astro + React islands)
+│   ├── src/pages/            # index, areas/[slug], areas, map, method
+│   ├── src/components/       # charts, drawn by hand in SVG and canvas
+│   ├── src/lib/              # typed build-time data access
+│   └── scripts/              # theme-parity gate and browser verification
 ├── scripts/                   # ETL and utility scripts
 └── .github/workflows/        # GitHub Actions
 ```
@@ -139,7 +141,7 @@ dbt run                       # Run all models
 dbt test                      # Run data quality tests
 dbt run --select <model>      # Run specific model
 
-# Evidence.dev operations
+# the static site operations
 cd reports
 npm run sources               # Regenerate data sources
 npm run dev                   # Development server
@@ -153,7 +155,9 @@ duckdb data/prod.duckdb       # Connect to database
 
 - `dbt_project.yml`: DBT configuration and materialization strategies
 - `config/profiles.yml`: DuckDB connection with spatial extension
-- `reports/evidence.config.yaml`: Evidence.dev theming and deployment settings
+- `site/astro.config.mjs`: base path `/al-pulse` for GitHub Pages
+- `site/FEATURE_PARITY.md`: what the site must render, and why each
+  departure from the old Evidence reports is a choice
 - `CLAUDE.md`: AI assistant guidance for working with this codebase
 
 ## Contributing
@@ -172,5 +176,5 @@ This is an open-source project. Contributions are welcome! The data and code are
 
 - Official AL mapping: [Turismo de Portugal Open Data](https://dadosabertos.turismodeportugal.pt/datasets/4e62eb1977564991bd01e61d7aa8266f_6/explore)
 - DBT Documentation: [docs.getdbt.com](https://docs.getdbt.com)
-- Evidence.dev Documentation: [docs.evidence.dev](https://docs.evidence.dev)
+- the static site Documentation: [docs.evidence.dev](https://docs.evidence.dev)
 - DuckDB Spatial: [duckdb.org/docs/extensions/spatial](https://duckdb.org/docs/extensions/spatial)
