@@ -81,9 +81,15 @@ async function checkPage(browser, route, label, theme, vp) {
     if (m.type() === 'error') problems.push(`console: ${m.text().slice(0, 200)}`);
   });
   page.on('pageerror', (e) => problems.push(`pageerror: ${String(e).slice(0, 200)}`));
-  page.on('requestfailed', (r) =>
-    problems.push(`request failed: ${r.url().slice(0, 160)}`)
-  );
+  page.on('requestfailed', (r) => {
+    // The basemap is a third-party tile service. A tile that does not exist at
+    // a given zoom is normal tile-server behaviour, and whether openfreemap.org
+    // is reachable is not a property of this build — failing the site's own
+    // verification on it would make the gate flaky for reasons outside the
+    // repo. Everything served from this origin is still fatal.
+    if (/openfreemap\.org|openstreetmap\.org/.test(r.url())) return;
+    problems.push(`request failed: ${r.url().slice(0, 160)}`);
+  });
 
   const url = `http://127.0.0.1:${PORT}${BASE}${route}`;
   const resp = await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
