@@ -242,6 +242,25 @@ def fetch_rooms(con: duckdb.DuckDBPyConnection) -> dict[str, list[dict]]:
     return by_slug
 
 
+def fetch_country_rooms(con: duckdb.DuckDBPyConnection) -> list[dict]:
+    """The national room-size distribution, for the overview page.
+
+    `room_distribution_comparison` is keyed by the area being *described*, and
+    carries that area's comparison levels as rows — so the country row appears
+    once per area and never under a slug of its own. Selecting it by slug
+    (`rooms["portugal"]`) therefore returned nothing, and the overview showed a
+    heading with no chart beneath it. It is one distribution repeated, so any
+    one copy is the whole answer.
+    """
+    return rows_as_dicts(con, """
+        SELECT DISTINCT ON (metric_name)
+               name, metric_name, room_category, value, admin_type, area_level
+        FROM room_distribution_comparison
+        WHERE admin_type = 'country'
+        ORDER BY metric_name, room_category
+        """)
+
+
 def fetch_map_features(con: duckdb.DuckDBPyConnection) -> list[dict]:
     """Per-locality values the choropleth colours and labels."""
     return rows_as_dicts(con, """
@@ -400,7 +419,7 @@ def main(
             "series": series.get(COUNTRY_AREA_ID),
             "skew": skew.get("portugal"),
             "events": events,
-            "rooms": rooms.get("portugal", []),
+            "rooms": fetch_country_rooms(con),
         },
     )
     total += write_json(

@@ -85,6 +85,7 @@ const pct = (v: number) => (v * 100).toFixed(1) + '%';
 <style>
   .rm { margin-bottom: 1.4rem; }
   .rm-row {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(6rem, 10rem) 1fr;
     align-items: center;
@@ -101,10 +102,14 @@ const pct = (v: number) => (v * 100).toFixed(1) + '%';
   .rm-bar {
     display: flex;
     height: 1.6rem;
-    border-radius: 3px;
-    overflow: hidden;
     background: var(--s-panel-2);
+    border-radius: 3px;
+    /* NOT overflow:hidden. It was there only to round the ends, and it clipped
+       every segment's tooltip out of existence — the labels simply never
+       appeared. The ends are rounded on the segments themselves instead. */
   }
+  .rm-seg:first-child { border-radius: 3px 0 0 3px; }
+  .rm-seg:last-child { border-radius: 0 3px 3px 0; }
   .rm-seg {
     position: relative;
     display: block;

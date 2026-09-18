@@ -42,20 +42,27 @@ interface Hovered {
  * near-black -> bright apricot. Both run subtle -> strong, so the legend is
  * written in those terms and the ends say which is which. */
 const METRICS: {
-  key: Metric; label: string; hint: string; invert: boolean; lo: string; hi: string;
+  key: Metric; label: string; hint: string; invert: boolean;
+  lo: string; hi: string; scale: 'quantile' | 'log';
 }[] = [
   {
+    // Rank is uniform by construction — 1..2471 with one locality at each — so
+    // quantile bins are just nine equal slabs and the whole top of the table
+    // lands in a single shade. Ranks 1 and 275 were the same colour. Log bins
+    // give the head of the distribution, which is the part anyone is looking
+    // at, its own colours.
     key: 'rank_within_country', label: 'Rank by ALs', invert: true,
+    scale: 'log',
     hint: 'stronger colour = higher up the national ranking',
     lo: 'lowest ranked', hi: 'rank 1',
   },
   {
-    key: 'al_count', label: 'Number of ALs', invert: false,
+    key: 'al_count', label: 'Number of ALs', invert: false, scale: 'quantile',
     hint: 'stronger colour = more registrations',
     lo: 'fewest', hi: 'most',
   },
   {
-    key: 'people_per_al', label: 'Residents per AL', invert: true,
+    key: 'people_per_al', label: 'Residents per AL', invert: true, scale: 'quantile',
     hint: 'stronger colour = denser (fewer residents per registration)',
     lo: 'least dense', hi: 'densest',
   },
@@ -93,6 +100,11 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
   const mapRef = useRef<MLMap | null>(null);
   const hoverIdRef = useRef<number | string | null>(null);
   const pinnedRef = useRef(false);
+  // The init effect must run exactly once — re-running it rebuilds the map and
+  // discards wherever the reader had panned to. These callbacks close over
+  // `metric`, so they are reached through refs instead of the dep array.
+  const addLayersRef = useRef<((m: MLMap, d: GeoJSON.FeatureCollection) => void) | null>(null);
+  const computeBreaksRef = useRef<((f: GeoJSON.Feature[]) => Record<Metric, number[]>) | null>(null);
 
   const [metric, setMetric] = useState<Metric>('rank_within_country');
   const [hovered, setHovered] = useState<Hovered | null>(null);
@@ -115,10 +127,24 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
           .map((f) => f.properties?.[m.key])
           .filter((v): v is number => typeof v === 'number')
           .sort((a, b) => a - b);
+        if (!vals.length) {
+          out[m.key] = [];
+          continue;
+        }
         const cuts: number[] = [];
-        for (let i = 1; i < steps; i++) {
-          const v = vals[Math.floor((i / steps) * vals.length)];
-          if (typeof v === 'number') cuts.push(v);
+        if (m.scale === 'log') {
+          // Geometric stops across the range, so the first few ranks each get a
+          // colour and the long tail shares one.
+          const minV = Math.max(1, vals[0] ?? 1);
+          const maxV = Math.max(minV + 1, vals[vals.length - 1] ?? 1);
+          for (let i = 1; i < steps; i++) {
+            cuts.push(Math.round(minV * Math.pow(maxV / minV, i / steps)));
+          }
+        } else {
+          for (let i = 1; i < steps; i++) {
+            const v = vals[Math.floor((i / steps) * vals.length)];
+            if (typeof v === 'number') cuts.push(v);
+          }
         }
         // `step` needs strictly ascending stops; ties would throw.
         out[m.key] = cuts.filter((v, i, a) => i === 0 || v > (a[i - 1] ?? -Infinity));
@@ -196,6 +222,9 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
     [fillExpression, metric]
   );
 
+  addLayersRef.current = addLayers;
+  computeBreaksRef.current = computeBreaks;
+
   /* ------------------------------------------------------------------ init */
   useEffect(() => {
     const holder = holderRef.current;
@@ -239,21 +268,21 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
       })
       .then((gj: GeoJSON.FeatureCollection) => {
         data = gj;
-        breaksRef.current = computeBreaks(gj.features ?? []);
+        breaksRef.current = computeBreaksRef.current?.(gj.features ?? []) ?? breaksRef.current;
       })
       .catch((e) => setErr(String(e).slice(0, 160)));
 
     map.on('load', async () => {
       await load;
       if (!data) return;
-      addLayers(map, data);
+      addLayersRef.current?.(map, data);
       setReady(true);
     });
 
     // Re-add our layers after a basemap style swap: setStyle discards them.
     map.on('styledata', () => {
       if (!data || !map.isStyleLoaded()) return;
-      if (!map.getLayer(FILL)) addLayers(map, data);
+      if (!map.getLayer(FILL)) addLayersRef.current?.(map, data);
     });
 
     const move = (e: maplibregl.MapMouseEvent) => {
@@ -324,6 +353,8 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
       map.resize();
       if (!refitted && holder.clientWidth > 0) {
         refitted = true;
+        // Only the very first layout settles the view; after that a resize must
+        // not yank the reader back to the mainland.
         map.fitBounds(MAINLAND, { padding: 24, duration: 0 });
       }
     });
@@ -334,7 +365,10 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
       map.remove();
       mapRef.current = null;
     };
-  }, [geoUrl, addLayers, computeBreaks]);
+    // Deliberately once: re-running this rebuilds the map and throws away
+    // wherever the reader had panned to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geoUrl]);
 
   /* ------------------------------------------------------ theme + metric */
   useEffect(() => {

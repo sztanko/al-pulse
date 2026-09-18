@@ -6,6 +6,7 @@ import TimeSeries from '../../components/TimeSeries.tsx';
 import GrowthExplorer from '../../components/GrowthExplorer.tsx';
 import SubareaMix from '../../components/SubareaMix.tsx';
 import AreaTable from '../../components/AreaTable.tsx';
+import Tabs from '../../components/Tabs.astro';
 import {
   areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
   areaBySlug, observedPeak, lossStartIndex, unobservedIndices, type AreaRow,
@@ -104,66 +105,82 @@ const shrinking = pk.index < last && offPeak < -0.005;
     {' '}<a href={backHref}>← {backLabel}</a>
   </p>
 
-  <section class="grid" aria-label="Headline figures">
-    <Metric
-      title="Registered short-lets"
-      value={num0(total)}
-      change={growth3y}
-      changeLabel="over three years"
-    />
-    <Metric
-      title="Inhabitants per short-let"
-      value={inhabPerAl == null ? '—' : num0(inhabPerAl)}
-      change={inhabChange}
-      changeLabel="over three years"
-      note="Lower means denser: fewer residents for each registered let."
-    />
-    <Metric
-      title="Rank in Portugal"
-      value={rankC == null ? '—' : `${num0(rankC)}`}
-      context={`of ${num0(peers)} ${a.admin_type === 'region' ? 'districts' : a.admin_type === 'municipality' ? 'municipalities' : 'localities'}`}
-      rank={rankC != null && rankCThen != null ? rankC - rankCThen : null}
-      changeLabel="over three years"
-    />
-    {
-      !isRegion && (
+  {/* Three questions, three groups: how big it is, where it sits against
+      everywhere else, and how unevenly it is spread inside itself. Ranks in
+      particular only compare with each other, so they belong together. */}
+  <div class="metric-groups" aria-label="Headline figures">
+    <section class="metric-group" aria-labelledby="g-size">
+      <h2 class="metric-group-title" id="g-size">Size</h2>
+      <div class="grid">
         <Metric
-          title="Rank in its district"
-          value={rankR == null ? '—' : `${num0(rankR)}`}
-          rank={rankR != null && rankRThen != null ? rankR - rankRThen : null}
+          title="Registered short-lets"
+          value={num0(total)}
+          change={growth3y}
           changeLabel="over three years"
         />
-      )
-    }
-    {
-      isLocality && (
         <Metric
-          title="Rank in its municipality"
-          value={rankM == null ? '—' : `${num0(rankM)}`}
-          rank={rankM != null && rankMThen != null ? rankM - rankMThen : null}
+          title="Inhabitants per short-let"
+          value={inhabPerAl == null ? '—' : num0(inhabPerAl)}
+          change={inhabChange}
+          changeLabel="over three years"
+          note="Lower means denser: fewer residents for each registered let."
+        />
+      </div>
+    </section>
+
+    <section class="metric-group" aria-labelledby="g-rank">
+      <h2 class="metric-group-title" id="g-rank">Where it ranks</h2>
+      <div class="grid">
+        <Metric
+          title="In Portugal"
+          value={rankC == null ? '—' : `${num0(rankC)}`}
+          context={`of ${num0(peers)} ${a.admin_type === 'region' ? 'districts' : a.admin_type === 'municipality' ? 'municipalities' : 'localities'}`}
+          rank={rankC != null && rankCThen != null ? rankC - rankCThen : null}
           changeLabel="over three years"
         />
-      )
-    }
+        {
+          !isRegion && (
+            <Metric
+              title="In its district"
+              value={rankR == null ? '—' : `${num0(rankR)}`}
+              rank={rankR != null && rankRThen != null ? rankR - rankRThen : null}
+              changeLabel="over three years"
+            />
+          )
+        }
+        {
+          isLocality && (
+            <Metric
+              title="In its municipality"
+              value={rankM == null ? '—' : `${num0(rankM)}`}
+              rank={rankM != null && rankMThen != null ? rankM - rankMThen : null}
+              changeLabel="over three years"
+            />
+          )
+        }
+      </div>
+    </section>
+
     {
       !isLocality && d.skew && (
-        <Metric
-          title="Localities holding half its ALs"
-          value={pct1(d.skew.locality_rank_pcnt)}
-          note={`${d.skew.locality_rank} localities hold 50% of everything registered here`}
-        />
+        <section class="metric-group" aria-labelledby="g-conc">
+          <h2 class="metric-group-title" id="g-conc">How concentrated</h2>
+          <div class="grid">
+            <Metric
+              title="Localities holding half its ALs"
+              value={pct1(d.skew.locality_rank_pcnt)}
+              note={`${d.skew.locality_rank} localities hold 50% of everything registered here`}
+            />
+            <Metric
+              title="Population living there"
+              value={pct1(d.skew.total_population_pcnt)}
+              note="Share of this area's population in those same localities"
+            />
+          </div>
+        </section>
       )
     }
-    {
-      !isLocality && d.skew && (
-        <Metric
-          title="Population living there"
-          value={pct1(d.skew.total_population_pcnt)}
-          note="Share of this area's population in those same localities"
-        />
-      )
-    }
-  </section>
+  </div>
 
   <h2>Registrations over time</h2>
   <figure>
@@ -258,7 +275,26 @@ const shrinking = pk.index < last && offPeak < -0.005;
   }
 
   {
-    isRegion && kids.length > 0 && (
+    isRegion && kids.length > 0 && locs.length > 0 && (
+      <Tabs
+        id="lists"
+        label="Areas within this district"
+        tabs={[
+          { id: 'municipalities', label: `Municipalities (${kids.length})` },
+          { id: 'localities', label: `Localities (${locs.length})` },
+        ]}
+      >
+        <Fragment slot="municipalities">
+          <AreaTable client:visible rows={kids.map(toRow)} base={base} caption={`${kids.length} municipalities`} />
+        </Fragment>
+        <Fragment slot="localities">
+          <AreaTable client:visible rows={locs.map(toRow)} base={base} caption={`Every locality in ${d.name} — ${locs.length}`} />
+        </Fragment>
+      </Tabs>
+    )
+  }
+  {
+    isRegion && kids.length > 0 && locs.length === 0 && (
       <>
         <h2>Municipalities</h2>
         <AreaTable client:visible rows={kids.map(toRow)} base={base} caption={`${kids.length} municipalities`} />
@@ -270,14 +306,6 @@ const shrinking = pk.index < last && offPeak < -0.005;
       <>
         <h2>Localities</h2>
         <AreaTable client:visible rows={kids.map(toRow)} base={base} caption={`${kids.length} localities`} />
-      </>
-    )
-  }
-  {
-    isRegion && locs.length > 0 && (
-      <>
-        <h2>Every locality in {d.name}</h2>
-        <AreaTable client:visible rows={locs.map(toRow)} base={base} caption={`${locs.length} localities`} />
       </>
     )
   }

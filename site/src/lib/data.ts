@@ -92,15 +92,17 @@ export interface Skew {
 }
 
 export interface RoomRow {
-  slug: string;
   name: string;
   metric_name: string;
-  room_category: string | null;
+  room_category: number | string | null;
   value: number;
   admin_type: string;
   area_level: number;
-  group_id: number;
-  area_id: number;
+  /** Present on an area's own rows; absent on the national distribution, which
+   * is exported once rather than per area. */
+  slug?: string;
+  group_id?: number;
+  area_id?: number;
 }
 
 export interface EventRow {
