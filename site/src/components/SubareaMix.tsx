@@ -5,6 +5,7 @@
  * answers "who gained share", which absolute totals hide when everything grows.
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { timeTicks } from '../lib/ticks';
 import './SubareaMix.css';
 
 export interface SeriesIn {
@@ -129,15 +130,10 @@ export default function SubareaMix({ months, subareas, height = 320, maxSeries =
     return () => { clearTimeout(t); document.removeEventListener('pointerdown', off, true); };
   }, [pinned]);
 
-  const xTicks = useMemo(() => {
-    const out: { i: number; text: string }[] = [];
-    const step = Math.max(1, Math.round(n / (narrow ? 4 : 7)));
-    for (let i = 0; i < n; i += step) {
-      const m = months[i];
-      if (m) out.push({ i, text: m.slice(0, 4) });
-    }
-    return out;
-  }, [n, months, narrow]);
+  const xTicks = useMemo(
+    () => timeTicks(months, 0, n - 1, narrow ? 4 : 8),
+    [months, n, narrow]
+  );
 
   const readoutLeft = hover != null ? PAD.left + x(hover) : 0;
   const flip = readoutLeft > w * 0.62;

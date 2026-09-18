@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import AreaTable from '../../components/AreaTable.tsx';
+import Tabs from '../../components/Tabs.astro';
 import { areasOfType, meta, type AreaRow } from '../../lib/data';
 import { monthLabel } from '../../lib/format';
 
@@ -32,16 +33,27 @@ const localities = areasOfType('locality').map(toRow);
   <p class="lede">
     {m.counts.regions} districts, {m.counts.municipalities} municipalities and
     {' '}{m.counts.localities.toLocaleString('en-GB')} localities, as of
-    {' '}{monthLabel(m.data_through)}. Search or sort any table; each name opens
-    that area's own page.
+    {' '}{monthLabel(m.data_through)}. One tab per level — search or sort any
+    table; each name opens that area's own page.
   </p>
 
-  <h2>Districts and autonomous regions</h2>
-  <AreaTable client:load rows={regions} base={base} caption={`${regions.length} districts`} initial={25} />
-
-  <h2>Municipalities</h2>
-  <AreaTable client:visible rows={municipalities} base={base} caption={`${municipalities.length} municipalities`} initial={25} />
-
-  <h2>Localities</h2>
-  <AreaTable client:visible rows={localities} base={base} caption={`${localities.length} localities`} initial={25} />
+  <Tabs
+    id="areas"
+    label="Administrative level"
+    tabs={[
+      { id: 'regions', label: `Districts (${regions.length})` },
+      { id: 'municipalities', label: `Municipalities (${municipalities.length})` },
+      { id: 'localities', label: `Localities (${localities.length.toLocaleString('en-GB')})` },
+    ]}
+  >
+    <Fragment slot="regions">
+      <AreaTable client:load rows={regions} base={base} caption={`${regions.length} districts`} initial={25} />
+    </Fragment>
+    <Fragment slot="municipalities">
+      <AreaTable client:visible rows={municipalities} base={base} caption={`${municipalities.length} municipalities`} initial={25} />
+    </Fragment>
+    <Fragment slot="localities">
+      <AreaTable client:visible rows={localities} base={base} caption={`${localities.length} localities`} initial={25} />
+    </Fragment>
+  </Tabs>
 </Base>

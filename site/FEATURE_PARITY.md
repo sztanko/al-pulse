@@ -148,3 +148,61 @@ Recorded so they are choices, not omissions.
   latest month and names the peak separately, so the decline is the story
   rather than a number that silently stopped moving. The area pages were never
   affected — `admin_stats` filtered to the current month.
+
+
+## Second pass — what review changed
+
+Seven things dimi found on the built site, and what each one turned out to be.
+
+1. **The growth slider rebased nothing.** The slider was reading as a *range*
+   control: it moved the left edge of the drawn window. What it is for is
+   re-indexing — every line divided by its own value at the chosen month, so
+   they all meet at 100% there and the chart answers "who grew fastest *since*
+   then". The whole series is now rebased and the axis keeps its full span;
+   months before the base read below 100%. A series whose base value is zero
+   has no ratio and is drawn as a gap rather than as infinity.
+
+2. **Year-only tick labels on short spans.** Six bars all labelled "2025" say
+   nothing about which month each one is. `src/lib/ticks.ts` now picks the
+   granularity from the span — years beyond six, quarters (`Jan 25`) beyond
+   fifteen months, months otherwise — and every chart shares it.
+
+3. **The room-mix labels never appeared.** `.rm-bar` had `overflow: hidden`,
+   which was there only to round the ends of the bar, and it clipped away every
+   segment's `::after` readout. The ends are rounded on the first and last
+   segment instead. The verifier now hovers a segment and asserts the readout
+   renders, so this cannot come back silently.
+
+4. **Rank was coloured in nine equal slabs.** Rank is uniform by construction —
+   one locality at every value from 1 to 2,471 — so quantile bins gave each
+   shade exactly 275 ranks and the entire top of the table was one colour.
+   Rank now uses geometric bins, so ranks 1, 3 and 10 are distinguishable and
+   the long tail shares the palest shade. The other two metrics are genuinely
+   skewed and keep quantiles.
+
+5. **Changing the metric recentred the map.** The init effect listed the
+   layer-building callbacks in its dependency array, and those close over the
+   selected metric — so picking a different one tore the map down and built a
+   new one, which refitted to the mainland and discarded wherever the reader
+   had panned. The callbacks are reached through refs and the effect runs once
+   per geometry URL.
+
+6. **The headline figures were one undifferentiated row.** They answer three
+   different questions — how big the register is, what is leaving it, how
+   unevenly it sits on the map — and are now three labelled groups, side by
+   side where there is room.
+
+7. **The area lists were stacked.** Districts, municipalities and localities
+   are now tabs (`src/components/Tabs.astro`), as are a district's
+   municipalities and its localities. The panels are server-rendered open, each
+   under its own `<h2>`; the script hides all but one and reveals the strip, so
+   with no JavaScript the page is the old stacked page rather than a blank one.
+
+And one thing found while checking the above, unrelated to the rewrite:
+
+- **The national room mix was empty.** `room_distribution_comparison` is keyed
+  by the area being *described* and carries the country as one of that area's
+  comparison rows, so no row has `slug = 'portugal'` — the overview showed a
+  heading with nothing beneath it. The exporter now takes the country
+  distribution directly (it is one distribution repeated per area), and the
+  verifier asserts both pages actually draw bars.

@@ -13,6 +13,7 @@
  *  - arrow keys step through the series, and focus reveals what hover reveals.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { timeTicks } from '../lib/ticks';
 import './TimeSeries.css';
 
 export interface EventMark {
@@ -130,16 +131,10 @@ export default function TimeSeries({
     return d;
   }, [line2, x, yLine]);
 
-  const ticks = useMemo(() => {
-    const out: { i: number; text: string }[] = [];
-    const want = narrow ? 4 : 7;
-    const step = Math.max(1, Math.round(n / want));
-    for (let i = 0; i < n; i += step) {
-      const m = months2[i];
-      if (m) out.push({ i, text: m.slice(0, 4) });
-    }
-    return out;
-  }, [n, months2, narrow]);
+  const ticks = useMemo(
+    () => timeTicks(months2, 0, n - 1, narrow ? 4 : 8),
+    [months2, n, narrow]
+  );
 
   const yTicks = useMemo(() => {
     const out: number[] = [];

@@ -1,0 +1,169 @@
+---
+/** Tabbed sections, progressively enhanced.
+ *
+ * Long lists of areas were stacked one under the other, which made the page
+ * scroll past thousands of rows to reach the next thing. Tabs put them side by
+ * side without hiding that the other lists exist.
+ *
+ * The server renders every panel open, each under its own `<h2>` — exactly the
+ * stacked page. The script then hides all but one and shows the tab strip, so
+ * with no JavaScript (or before it runs) the page is still complete rather than
+ * blank. That ordering matters: the reverse — markup that starts hidden and is
+ * revealed by script — loses the content entirely when the script fails.
+ *
+ * Panels hold `client:visible` islands. A hidden panel never intersects the
+ * viewport, so its island hydrates the first time its tab is opened, which is
+ * the behaviour we want anyway: three big tables no longer all hydrate at once.
+ */
+interface Tab {
+  id: string;
+  label: string;
+}
+
+interface Props {
+  /** Unique on the page — used to build tab/panel ids. */
+  id: string;
+  tabs: Tab[];
+  /** Accessible name for the tab strip. */
+  label: string;
+}
+
+const { id, tabs, label } = Astro.props;
+
+/* `<slot name={t.id} />` is a compile error — Astro requires a literal slot
+ * name — so the panels are rendered here by name instead. `Astro.slots.render`
+ * returns the same HTML the slot would have produced, islands and all, with
+ * their hydration registered. */
+const panels = await Promise.all(
+  tabs.map(async (t) => ({
+    ...t,
+    html: Astro.slots.has(t.id) ? await Astro.slots.render(t.id) : '',
+  }))
+);
+---
+
+<div class="tabs" data-tabs>
+  <div class="tablist" role="tablist" aria-label={label}>
+    {
+      tabs.map((t, i) => (
+        <button
+          type="button"
+          role="tab"
+          id={`${id}-tab-${t.id}`}
+          class={`tab${i === 0 ? ' is-on' : ''}`}
+          aria-selected={i === 0 ? 'true' : 'false'}
+          aria-controls={`${id}-panel-${t.id}`}
+          tabindex={i === 0 ? 0 : -1}
+        >
+          {t.label}
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    panels.map((t) => (
+      <section
+        class="tabpanel"
+        role="tabpanel"
+        id={`${id}-panel-${t.id}`}
+        aria-labelledby={`${id}-tab-${t.id}`}
+        tabindex="0"
+      >
+        <h2 class="tabpanel-h2">{t.label}</h2>
+        <div set:html={t.html} />
+      </section>
+    ))
+  }
+</div>
+
+<script>
+  /* ARIA tab pattern: one tab in the tab order, arrows move between them. */
+  for (const root of document.querySelectorAll<HTMLElement>('[data-tabs]')) {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = tabs.map((t) =>
+      document.getElementById(t.getAttribute('aria-controls') ?? '')
+    );
+    if (tabs.length < 2) continue;
+
+    const select = (i: number, focus: boolean) => {
+      tabs.forEach((t, k) => {
+        const on = k === i;
+        t.classList.toggle('is-on', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        t.tabIndex = on ? 0 : -1;
+        const p = panels[k];
+        if (p) p.hidden = !on;
+      });
+      if (focus) tabs[i]?.focus();
+    };
+
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => select(i, false));
+      t.addEventListener('keydown', (e) => {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (!keys.includes(e.key)) return;
+        e.preventDefault();
+        const last = tabs.length - 1;
+        const next =
+          e.key === 'Home' ? 0
+          : e.key === 'End' ? last
+          : e.key === 'ArrowRight' ? (i === last ? 0 : i + 1)
+          : i === 0 ? last : i - 1;
+        select(next, true);
+      });
+    });
+
+    root.classList.add('is-enhanced');
+    select(0, false);
+  }
+</script>
+
+<style>
+  /* Before the script runs the strip is not operable, so it is not shown; the
+     panels below are the whole content until then. */
+  .tablist { display: none; }
+  .tabs.is-enhanced .tablist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0 0 0.9rem;
+    border-bottom: 1px solid var(--s-rule);
+  }
+  .tabs.is-enhanced .tabpanel-h2 {
+    /* The tab already names the panel; a heading repeating it is noise. Kept in
+       the DOM for the panel's accessible name via aria-labelledby on the tab. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tab {
+    appearance: none;
+    background: none;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 0.5rem 0.85rem;
+    margin-bottom: -1px;
+    font: inherit;
+    font-size: 0.92rem;
+    color: var(--s-ink-soft);
+    cursor: pointer;
+  }
+  .tab:hover { color: var(--s-ink); }
+  .tab:focus-visible { outline: 2px solid var(--s-focus); outline-offset: -2px; }
+  .tab.is-on {
+    color: var(--s-ink);
+    font-weight: 600;
+    background: var(--s-panel);
+    border-color: var(--s-rule);
+    border-bottom: 1px solid var(--s-panel);
+  }
+
+  .tabpanel:focus { outline: none; }
+  .tabpanel[hidden] { display: none; }
+</style>

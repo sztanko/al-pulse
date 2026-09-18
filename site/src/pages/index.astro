@@ -68,42 +68,59 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
     }
   </p>
 
-  <section class="grid" aria-label="Headline figures">
-    <Metric
-      title="Registered short-lets"
-      value={num0(total)}
-      change={growth3y}
-      changeLabel="over three years"
-    />
-    <Metric
-      title="Licences lost, last month"
-      value={num0(lost.lastMonth)}
-      note={`${monthLabel(m.data_through)} alone`}
-    />
-    <Metric
-      title="Licences lost, year to date"
-      value={num0(lost.ytd)}
-      note={`Against ${num0(lost.prevYear)} in all of ${Number(m.data_through.slice(0, 4)) - 1}`}
-    />
+  {/* Grouped, because these five numbers answer three different questions:
+      how big the register is, what is leaving it, and how unevenly it sits on
+      the map. Laid out as one flat row they read as a single list of facts of
+      equal kind, which they are not. */}
+  <div class="metric-groups" aria-label="Headline figures">
+    <section class="metric-group" aria-labelledby="g-size">
+      <h2 class="metric-group-title" id="g-size">The register</h2>
+      <div class="grid">
+        <Metric
+          title="Registered short-lets"
+          value={num0(total)}
+          change={growth3y}
+          changeLabel="over three years"
+        />
+      </div>
+    </section>
+
+    <section class="metric-group" aria-labelledby="g-lost">
+      <h2 class="metric-group-title" id="g-lost">Licences leaving</h2>
+      <div class="grid">
+        <Metric
+          title="Lost last month"
+          value={num0(lost.lastMonth)}
+          note={`${monthLabel(m.data_through)} alone`}
+        />
+        <Metric
+          title="Lost year to date"
+          value={num0(lost.ytd)}
+          note={`Against ${num0(lost.prevYear)} in all of ${Number(m.data_through.slice(0, 4)) - 1}`}
+        />
+      </div>
+    </section>
+
     {
       c.skew && (
-        <Metric
-          title="Localities holding half the ALs"
-          value={pct1(c.skew.locality_rank_pcnt)}
-          note={`${c.skew.locality_rank} of ${m.counts.localities.toLocaleString('en-GB')} localities hold 50% of every registration`}
-        />
+        <section class="metric-group" aria-labelledby="g-conc">
+          <h2 class="metric-group-title" id="g-conc">How concentrated</h2>
+          <div class="grid">
+            <Metric
+              title="Localities holding half the ALs"
+              value={pct1(c.skew.locality_rank_pcnt)}
+              note={`${c.skew.locality_rank} of ${m.counts.localities.toLocaleString('en-GB')} localities hold 50% of every registration`}
+            />
+            <Metric
+              title="Population living there"
+              value={pct1(c.skew.total_population_pcnt)}
+              note="Share of Portugal's population in those same localities"
+            />
+          </div>
+        </section>
       )
     }
-    {
-      c.skew && (
-        <Metric
-          title="Population living there"
-          value={pct1(c.skew.total_population_pcnt)}
-          note="Share of Portugal's population in those same localities"
-        />
-      )
-    }
-  </section>
+  </div>
 
   <h2>Registrations, and what stopped them</h2>
   <p>
@@ -178,9 +195,15 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
     </figcaption>
   </figure>
 
-  <h2>What size are they?</h2>
-  <RoomMix
-    rows={c.rooms}
-    caption="Share of registrations by number of rooms, nationally."
-  />
+  {
+    c.rooms.length > 0 && (
+      <>
+        <h2>What size are they?</h2>
+        <RoomMix
+          rows={c.rooms}
+          caption="Share of registrations by number of rooms, nationally."
+        />
+      </>
+    )
+  }
 </Base>

@@ -202,6 +202,127 @@ async function checkSlider(browser) {
   const hasBaseline = await page.locator('.ge-base').count();
   if (hasBaseline < 2) fail(where, 'missing the 100% baseline / base-month rule');
 
+  // Moving the base must rescale the lines, not crop the window to it. An
+  // earlier version drew only from the base month onward, which is the thing
+  // dimi reported. Every line still has to start at the left edge.
+  const starts = await page.locator('.ge-line').evaluateAll((els) =>
+    els.map((e) => Number((e.getAttribute('d') ?? 'M999').slice(1).split(',')[0]))
+  );
+  if (!starts.length || starts.some((v) => !Number.isFinite(v) || v > 1)) {
+    fail(
+      where,
+      `lines do not start at the axis origin (x = ${starts.join(', ')}) - the window was cropped instead of rebased`
+    );
+  }
+
+  await ctx.close();
+}
+
+/** Tabs must switch panels, and an island inside a tab must still hydrate -
+ * a `client:visible` island in a hidden panel never intersects the viewport,
+ * so the risk is a table that renders but never becomes interactive. */
+async function checkTabs(browser) {
+  const where = 'areas tabs [wide]';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas`, {
+    waitUntil: 'networkidle',
+    timeout: 45000,
+  });
+
+  const ids = ['regions', 'municipalities', 'localities'];
+  const tabCount = await page.locator('[role="tab"]').count();
+  if (tabCount !== ids.length) {
+    fail(where, `expected ${ids.length} tabs, found ${tabCount}`);
+    await ctx.close();
+    return;
+  }
+  if (!(await page.locator('.tabs.is-enhanced').count())) {
+    fail(where, 'the tab strip never enhanced - panels are still stacked');
+  }
+
+  for (const id of ids) {
+    await page.locator(`#areas-tab-${id}`).click();
+    await page.waitForTimeout(400);
+
+    const panel = page.locator(`#areas-panel-${id}`);
+    if (!(await panel.isVisible())) fail(where, `panel ${id} did not open`);
+
+    for (const o of ids.filter((x) => x !== id)) {
+      if (await page.locator(`#areas-panel-${o}`).isVisible()) {
+        fail(where, `panel ${o} stayed open while ${id} was selected`);
+      }
+    }
+
+    // Hydration: type in the search box and watch the row count fall.
+    const search = panel.locator('.at-search input');
+    await search.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const before = await panel.locator('.at-table tbody tr').count();
+    await search.fill('zzzznotanarea');
+    await page.waitForTimeout(300);
+    const after = await panel.locator('.at-table tbody tr').count();
+    if (!(before > 0 && after < before)) {
+      fail(
+        where,
+        `table in ${id} did not hydrate (rows ${before} -> ${after} on a search matching nothing)`
+      );
+    }
+    await search.fill('');
+  }
+
+  // Keyboard, per the ARIA tab pattern.
+  await page.locator('#areas-tab-regions').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(200);
+  const focused = await page.evaluate(() => document.activeElement?.id ?? '');
+  if (focused !== 'areas-tab-municipalities') {
+    fail(where, `ArrowRight did not move to the next tab (focus is "${focused}")`);
+  }
+
+  await ctx.close();
+}
+
+/** The room-size bars, and the readout on each segment.
+ *
+ * Two things have gone wrong here before and neither shows up in a build: the
+ * national distribution exported empty, leaving a heading with nothing under
+ * it, and the bar clipped its own tooltips so no segment label ever appeared.
+ */
+async function checkRoomMix(browser) {
+  const where = 'room mix [wide]';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+
+  for (const route of ['/', '/areas/faro']) {
+    await page.goto(`http://127.0.0.1:${PORT}${BASE}${route}`, {
+      waitUntil: 'networkidle',
+      timeout: 45000,
+    });
+    const segs = page.locator('.rm-seg');
+    const count = await segs.count();
+    if (count === 0) {
+      fail(where, `${route} has no room-size bars — the payload is empty`);
+      continue;
+    }
+    const seg = segs.nth(Math.min(2, count - 1));
+    await seg.scrollIntoViewIfNeeded();
+    await seg.hover();
+    await page.waitForTimeout(250);
+
+    const tip = await seg.evaluate((el) => {
+      const cs = getComputedStyle(el, '::after');
+      const bar = el.closest('.rm-bar');
+      return {
+        display: cs.display,
+        clipped: bar ? getComputedStyle(bar).overflow : 'none',
+      };
+    });
+    if (tip.display === 'none') fail(where, `${route}: the segment readout never appears on hover`);
+    if (tip.clipped.includes('hidden')) {
+      fail(where, `${route}: .rm-bar has overflow:${tip.clipped}, which clips the readout away`);
+    }
+  }
+
   await ctx.close();
 }
 
@@ -219,6 +340,8 @@ try {
     }
   }
   await checkSlider(browser);
+  await checkTabs(browser);
+  await checkRoomMix(browser);
 } catch (e) {
   fail('harness', String(e).slice(0, 300));
 } finally {
@@ -233,5 +356,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `verify ok — ${ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider`
+  `verify ok — ${ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs and the room mix`
 );

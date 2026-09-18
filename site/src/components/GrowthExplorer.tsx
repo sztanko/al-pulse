@@ -10,6 +10,7 @@
  * hierarchy, and the area's children against each other.
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { timeTicks } from '../lib/ticks';
 import './GrowthExplorer.css';
 
 export interface SeriesIn {
@@ -86,9 +87,11 @@ export default function GrowthExplorer({
   const { drawn, lo, hi } = useMemo(() => {
     const out = active.map((s) => {
       const b = s.cum[baseIdx];
-      const vals = s.cum.map((v, i) =>
-        !b || v == null || i < baseIdx ? null : v / b
-      );
+      // Rebase the entire series. Months before the base read below 100% and
+      // months after above it, and every line crosses 100% at the base — which
+      // is the comparison the control exists to make. A zero base (the area had
+      // no registrations yet) has no meaningful ratio, so it yields nothing.
+      const vals = s.cum.map((v) => (!b || v == null ? null : v / b));
       return { name: s.name, slug: s.slug, vals };
     });
     let mn = 1;
@@ -103,13 +106,9 @@ export default function GrowthExplorer({
     return { drawn: out, lo: Math.max(0, mn - pad), hi: mx + pad };
   }, [active, baseIdx]);
 
-  // The axis spans the drawn window, not the whole series. Mapping over all
-  // 177 months while only the post-base months carry values left most of the
-  // plot empty and squeezed the part being compared into the right-hand edge.
-  const span = Math.max(1, n - 1 - baseIdx);
   const x = useCallback(
-    (i: number) => ((i - baseIdx) / span) * innerW,
-    [baseIdx, span, innerW]
+    (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * innerW),
+    [n, innerW]
   );
   const y = useCallback(
     (v: number) => innerH - ((v - lo) / (hi - lo || 1)) * innerH,
@@ -137,31 +136,14 @@ export default function GrowthExplorer({
     return out;
   }, [lo, hi]);
 
-  /** One tick per year in the drawn window. Stepping by a fixed index and
-   * labelling the year printed the same year twice whenever the step landed in
-   * it more than once. */
-  const xTicks = useMemo(() => {
-    const seen = new Set<string>();
-    const years: { i: number; text: string }[] = [];
-    for (let i = baseIdx; i < n; i++) {
-      const y = months[i]?.slice(0, 4);
-      if (!y || seen.has(y)) continue;
-      seen.add(y);
-      years.push({ i, text: y });
-    }
-    // Thin them if the window is long or the screen is narrow.
-    const want = narrow ? 5 : 9;
-    if (years.length <= want) return years;
-    const every = Math.ceil(years.length / want);
-    return years.filter((_, k) => k % every === 0);
-  }, [n, baseIdx, months, narrow]);
+  const xTicks = useMemo(() => timeTicks(months, 0, n - 1, narrow ? 5 : 9), [months, n, narrow]);
 
   const eventIdx = useMemo(
     () =>
       events
         .map((e) => ({ i: months.indexOf(e.month), label: e.label }))
-        .filter((e) => e.i >= baseIdx),
-    [events, months, baseIdx]
+        .filter((e) => e.i >= 0),
+    [events, months]
   );
 
   const nearest = useCallback(
@@ -170,11 +152,10 @@ export default function GrowthExplorer({
       if (!svg) return null;
       const r = svg.getBoundingClientRect();
       const px = clientX - r.left - PAD.left;
-      // Inverse of x(): the axis runs from the base month, not from month 0.
-      const i = baseIdx + Math.round((px / innerW) * span);
-      return Math.max(baseIdx, Math.min(n - 1, i));
+      const i = Math.round((px / innerW) * (n - 1));
+      return Math.max(0, Math.min(n - 1, i));
     },
-    [innerW, n, baseIdx, span]
+    [innerW, n]
   );
 
   useEffect(() => {
@@ -285,10 +266,10 @@ export default function GrowthExplorer({
           e.preventDefault();
           setHover((h) => {
             const cur = h ?? n - 1;
-            if (e.key === 'Home') return baseIdx;
+            if (e.key === 'Home') return 0;
             if (e.key === 'End') return n - 1;
             const next = cur + (e.key === 'ArrowRight' ? 1 : -1);
-            return Math.max(baseIdx, Math.min(n - 1, next));
+            return Math.max(0, Math.min(n - 1, next));
           });
         }}
       >

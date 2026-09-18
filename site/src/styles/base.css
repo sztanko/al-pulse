@@ -133,6 +133,36 @@ p { margin: 0 0 0.9em; max-width: var(--measure); }
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
+/* Headline figures, grouped by what they are about - size, movement, shape -
+ * rather than laid out as one undifferentiated row of tiles. A reader scanning
+ * five numbers with no grouping has to work out the kinship themselves.
+ *
+ * The groups sit side by side once there is room, each under its own rule, and
+ * stack into labelled bands when there is not. Tiles fill their group's column,
+ * so a group holding a single number is a full-width tile rather than one tile
+ * with four empty tracks beside it. */
+.metric-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  align-items: start;
+  gap: var(--gap) 1.6rem;
+  margin-bottom: 1.6rem;
+}
+.metric-group > .grid {
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+}
+.metric-group-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--s-ink-faint);
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--s-rule);
+}
+
 .chart-scroll {
   overflow-x: auto;
   overflow-y: hidden;
