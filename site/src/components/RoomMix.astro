@@ -1,0 +1,144 @@
+---
+/** Room-size mix: one 100% stacked bar per geographic level, so an area reads
+ * against its parent and the country on a shared baseline.
+ *
+ * Server-rendered and ships no JavaScript. The per-segment readout is
+ * `tabindex="0"` + `:focus` + a pseudo-element, which works on hover *and* on
+ * tap — `:focus`, not `:focus-visible`, because most browsers treat the latter
+ * as keyboard-only and a tapped segment would then stay silent.
+ */
+import type { RoomRow } from '../lib/data';
+
+interface Props {
+  rows: RoomRow[];
+  title?: string;
+  caption?: string;
+}
+
+const { rows, title, caption } = Astro.props;
+
+// Group by geographic level, keeping the level order the mart records.
+const byLevel = new Map<string, { name: string; level: number; parts: RoomRow[] }>();
+for (const r of rows) {
+  const g = byLevel.get(r.name) ?? { name: r.name, level: r.area_level, parts: [] };
+  g.parts.push(r);
+  byLevel.set(r.name, g);
+}
+const levels = [...byLevel.values()].sort((a, b) => a.level - b.level);
+
+// Fixed category order and colour, so the same room size is the same colour on
+// every bar and on every page. Colour is repeated in the legend, never alone.
+const ORDER = ['0 rooms', '1 room', '2 rooms', '3 rooms', 'More than 3 rooms'];
+const TOKEN: Record<string, string> = {
+  '0 rooms': '--m-cat-1',
+  '1 room': '--m-cat-2',
+  '2 rooms': '--m-cat-3',
+  '3 rooms': '--m-cat-4',
+  'More than 3 rooms': '--m-cat-5',
+};
+const pct = (v: number) => (v * 100).toFixed(1) + '%';
+---
+
+{
+  levels.length > 0 && (
+    <figure class="rm">
+      {title && <figcaption class="chart-title">{title}</figcaption>}
+
+      <div class="legend">
+        {ORDER.map((k) => (
+          <span>
+            <i style={`background: var(${TOKEN[k]})`} />
+            {k}
+          </span>
+        ))}
+      </div>
+
+      {levels.map((lv) => {
+        const parts = ORDER.map((k) => lv.parts.find((p) => p.metric_name === k)).filter(
+          (p): p is RoomRow => !!p
+        );
+        const total = parts.reduce((s, p) => s + p.value, 0) || 1;
+        return (
+          <div class="rm-row">
+            <div class="rm-name">{lv.name}</div>
+            <div class="rm-bar" role="img" aria-label={
+              `${lv.name}: ` + parts.map((p) => `${p.metric_name} ${pct(p.value / total)}`).join(', ')
+            }>
+              {parts.map((p) => (
+                <span
+                  class="rm-seg"
+                  tabindex="0"
+                  style={`width:${(p.value / total) * 100}%; background: var(${TOKEN[p.metric_name]})`}
+                  data-tip={`${p.metric_name} — ${pct(p.value / total)}`}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {caption && <figcaption>{caption}</figcaption>}
+    </figure>
+  )
+}
+
+<style>
+  .rm { margin-bottom: 1.4rem; }
+  .rm-row {
+    display: grid;
+    grid-template-columns: minmax(6rem, 10rem) 1fr;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.3rem;
+  }
+  .rm-name {
+    font-size: 0.85rem;
+    color: var(--s-ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rm-bar {
+    display: flex;
+    height: 1.6rem;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--s-panel-2);
+  }
+  .rm-seg {
+    position: relative;
+    display: block;
+    min-width: 2px;
+    cursor: default;
+  }
+  .rm-seg:focus { outline: 2px solid var(--s-focus); outline-offset: -2px; }
+
+  /* A hidden tooltip must not occupy layout: `visibility: hidden` still counts
+   * toward scrollable overflow, and a row of these silently widens the page. */
+  .rm-seg::after {
+    content: attr(data-tip);
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: var(--s-panel);
+    color: var(--s-ink);
+    border: 1px solid var(--s-rule-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 14px var(--s-shadow);
+    padding: 0.3rem 0.5rem;
+    font-size: 0.78rem;
+    z-index: 6;
+    pointer-events: none;
+  }
+  .rm-seg:hover::after,
+  .rm-seg:focus::after {
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .rm-row { grid-template-columns: minmax(4.5rem, 7rem) 1fr; }
+  }
+</style>

@@ -1,0 +1,186 @@
+---
+import Base from '../layouts/Base.astro';
+import Metric from '../components/Metric.astro';
+import RoomMix from '../components/RoomMix.astro';
+import TimeSeries from '../components/TimeSeries.tsx';
+import AreaTable from '../components/AreaTable.tsx';
+import {
+  meta, country, areasOfType, lostSummary, observedPeak,
+  lossStartIndex, unobservedIndices,
+} from '../lib/data';
+import { num0, pct1, monthLabel } from '../lib/format';
+
+const m = meta();
+const c = country();
+const regions = areasOfType('region');
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const months = m.months;
+const last = months.length - 1;
+const total = c.series.cum_c[last] ?? 0;
+const lost = lostSummary(c.series);
+
+// Every number in prose is derived, never typed: a hardcoded figure in a
+// heading goes stale silently and is always wrong within a week.
+const threeYearsAgo = Math.max(0, last - 36);
+const totalThen = c.series.cum_c[threeYearsAgo] ?? 0;
+const growth3y = totalThen ? total / totalThen - 1 : null;
+
+// The peak is taken over *observed* months only. Between two pulls the series
+// is an interpolation, and its local maximum is an artefact of when we looked
+// rather than anything the register did.
+const pk = observedPeak(c.series.cum_c);
+const offPeak = pk.value ? total / pk.value - 1 : 0;
+const shrinking = pk.index < last && offPeak < -0.001;
+
+const events = c.events.map((e) => ({ month: e.month, label: e.event_name }));
+
+const regionRows = regions.map((r) => ({
+  slug: r.slug,
+  name: r.name,
+  al_count: r.al_count,
+  inhabitants_per_al: r.inhabitants_per_al,
+  al_per_1000: r.al_per_1000,
+  rank_within_country: r.rank_within_country,
+  al_count_growth_pcnt: r.al_count_growth_pcnt,
+  rank_within_country_change: r.rank_within_country_change,
+}));
+
+const title = 'Portugal Alojamento Local — the short-let register, month by month';
+---
+
+<Base title={title} active="home" description={`Every registered Alojamento Local in mainland Portugal and Madeira, ${monthLabel(months[0] ?? '')} to ${monthLabel(m.data_through)}.`}>
+  <h1>Portugal's short-let register</h1>
+
+  <p class="lede">
+    Every Alojamento Local on the national register, by locality, month by month
+    from {monthLabel(months[0] ?? '')} to {monthLabel(m.data_through)}.
+    {
+      shrinking ? (
+        <>
+          The register is no longer growing: at the last count before the
+          decline it stood at {num0(pk.value)} in {monthLabel(pk.month)}, and
+          it now holds {num0(total)} — {pct1(Math.abs(offPeak))} fewer.
+        </>
+      ) : (
+        <>It now holds {num0(total)} active registrations.</>
+      )
+    }
+  </p>
+
+  <section class="grid" aria-label="Headline figures">
+    <Metric
+      title="Registered short-lets"
+      value={num0(total)}
+      change={growth3y}
+      changeLabel="over three years"
+    />
+    <Metric
+      title="Licences lost, last month"
+      value={num0(lost.lastMonth)}
+      note={`${monthLabel(m.data_through)} alone`}
+    />
+    <Metric
+      title="Licences lost, year to date"
+      value={num0(lost.ytd)}
+      note={`Against ${num0(lost.prevYear)} in all of ${Number(m.data_through.slice(0, 4)) - 1}`}
+    />
+    {
+      c.skew && (
+        <Metric
+          title="Localities holding half the ALs"
+          value={pct1(c.skew.locality_rank_pcnt)}
+          note={`${c.skew.locality_rank} of ${m.counts.localities.toLocaleString('en-GB')} localities hold 50% of every registration`}
+        />
+      )
+    }
+    {
+      c.skew && (
+        <Metric
+          title="Population living there"
+          value={pct1(c.skew.total_population_pcnt)}
+          note="Share of Portugal's population in those same localities"
+        />
+      )
+    }
+  </section>
+
+  <h2>Registrations, and what stopped them</h2>
+  <p>
+    The line is the running total; the bars are registrations added each month.
+    Dashed rules mark the policy changes.
+  </p>
+  <figure>
+    <TimeSeries
+      client:load
+      months={months}
+      line={c.series.cum_c}
+      bars={c.series.c}
+      lineLabel="Total registered"
+      barLabel="New that month"
+      events={events}
+      height={320}
+    />
+    <figcaption>
+      Hover, tap or focus the chart and use the arrow keys to read any month.
+    </figcaption>
+  </figure>
+
+  <h2>Licences leaving the register</h2>
+  <p>
+    A licence is only visible as lost between two consecutive pulls of the
+    register, so this chart starts at {monthLabel(m.loss_observable_from)} — the
+    first month there were two pulls to compare. It is not that nothing lapsed
+    before then; it is that nothing could be seen to.
+    {
+      m.unobserved_months.length > 0 && (
+        <>
+          {' '}The register was not pulled between{' '}
+          {monthLabel(m.unobserved_months[0]!)} and{' '}
+          {monthLabel(m.unobserved_months[m.unobserved_months.length - 1]!)}, so
+          those months are blank rather than zero, and every loss found in that
+          stretch is attributed to {monthLabel(m.data_through)}.
+        </>
+      )
+    }
+  </p>
+  <figure>
+    <TimeSeries
+      client:visible
+      months={months}
+      line={c.series.cum_lost}
+      bars={c.series.lost}
+      lineLabel="Lost, cumulative"
+      barLabel="Lost that month"
+      events={events}
+      height={300}
+      startIndex={lossStartIndex()}
+      unobserved={unobservedIndices()}
+    />
+    <figcaption>
+      {m.observed_months.length} pulls of the register so far, the first in{' '}
+      {monthLabel(m.observed_months[0]!)}.
+    </figcaption>
+  </figure>
+
+  <h2>Districts and autonomous regions</h2>
+  <figure>
+    <AreaTable
+      client:visible
+      rows={regionRows}
+      base={base}
+      caption={`${regions.length} districts`}
+      initial={25}
+    />
+    <figcaption>
+      Sort by any column. Bars share one scale per column across every row, so
+      lengths keep comparing when you search.
+    </figcaption>
+  </figure>
+
+  <h2>What size are they?</h2>
+  <RoomMix
+    rows={c.rooms}
+    caption="Share of registrations by number of rooms, nationally."
+  />
+</Base>

@@ -1,0 +1,111 @@
+.ch { width: 100%; min-width: 0; }
+
+.ch-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.ch-metrics, .ch-zoom { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.ch-zoom { margin-left: auto; }
+.ch-metrics button,
+.ch-zoom button {
+  font: inherit;
+  font-size: 0.83rem;
+  padding: 0.5rem 0.7rem;
+  min-height: 40px;
+  min-width: 40px;
+  border: 1px solid var(--s-rule);
+  background: var(--s-panel);
+  color: var(--s-ink-soft);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.ch-metrics button.is-on {
+  background: var(--s-panel-2);
+  color: var(--s-ink);
+  border-color: var(--s-rule-strong);
+  font-weight: 600;
+}
+
+.ch-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+}
+.ch-ramp { display: inline-flex; border-radius: 3px; overflow: hidden; }
+.ch-ramp i { width: 18px; height: 11px; display: block; }
+
+.ch-stage {
+  position: relative;
+  border: 1px solid var(--s-rule);
+  border-radius: var(--radius);
+  background: var(--s-panel);
+  overflow: hidden;
+}
+
+.ch-canvas {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.ch-canvas:active { cursor: grabbing; }
+
+/* The hit-test surface is never shown; it only has to exist at the same size.
+ * `display:none` would stop it being painted, so it is moved out of view
+ * instead — and it is aria-hidden so it is not announced. */
+.ch-pick {
+  position: absolute;
+  left: -99999px;
+  top: 0;
+  pointer-events: none;
+}
+
+.ch-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+
+/* The readout goes to the pointer. */
+.ch-readout {
+  position: absolute;
+  background: var(--s-panel);
+  border: 1px solid var(--s-rule-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px var(--s-shadow);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.82rem;
+  z-index: 6;
+  min-width: 13rem;
+  max-width: 16rem;
+}
+/* On a narrow screen there is no room beside a mark, so it pins to the bottom. */
+.ch-readout.is-pinned {
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  top: auto;
+  max-width: none;
+}
+.ch-readout-name { font-weight: 660; }
+.ch-readout-sub {
+  display: block;
+  margin-bottom: 0.3rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ch-readout dl { margin: 0 0 0.4rem; }
+.ch-readout dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.ch-readout dt { color: var(--s-ink-soft); }
+.ch-readout dd { margin: 0; font-weight: 600; }

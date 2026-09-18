@@ -1,0 +1,47 @@
+---
+import Base from '../../layouts/Base.astro';
+import AreaTable from '../../components/AreaTable.tsx';
+import { areasOfType, meta, type AreaRow } from '../../lib/data';
+import { monthLabel } from '../../lib/format';
+
+const m = meta();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const toRow = (x: AreaRow) => ({
+  slug: x.slug,
+  name: x.admin_type === 'locality' ? x.full_name : x.name,
+  al_count: x.al_count,
+  inhabitants_per_al: x.inhabitants_per_al,
+  al_per_1000: x.al_per_1000,
+  rank_within_country: x.rank_within_country,
+  al_count_growth_pcnt: x.al_count_growth_pcnt,
+  rank_within_country_change: x.rank_within_country_change,
+});
+
+const regions = areasOfType('region').map(toRow);
+const municipalities = areasOfType('municipality').map(toRow);
+const localities = areasOfType('locality').map(toRow);
+---
+
+<Base
+  title="Every area — AL Pulse"
+  active="areas"
+  description="Search and sort every Portuguese district, municipality and locality by registered short-lets."
+>
+  <h1>Every area</h1>
+  <p class="lede">
+    {m.counts.regions} districts, {m.counts.municipalities} municipalities and
+    {' '}{m.counts.localities.toLocaleString('en-GB')} localities, as of
+    {' '}{monthLabel(m.data_through)}. Search or sort any table; each name opens
+    that area's own page.
+  </p>
+
+  <h2>Districts and autonomous regions</h2>
+  <AreaTable client:load rows={regions} base={base} caption={`${regions.length} districts`} initial={25} />
+
+  <h2>Municipalities</h2>
+  <AreaTable client:visible rows={municipalities} base={base} caption={`${municipalities.length} municipalities`} initial={25} />
+
+  <h2>Localities</h2>
+  <AreaTable client:visible rows={localities} base={base} caption={`${localities.length} localities`} initial={25} />
+</Base>

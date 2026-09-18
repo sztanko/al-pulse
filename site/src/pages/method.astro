@@ -1,0 +1,118 @@
+---
+import Base from '../layouts/Base.astro';
+import { meta } from '../lib/data';
+import { monthLabel } from '../lib/format';
+
+const m = meta();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const gaps = m.unobserved_months;
+---
+
+<Base
+  title="Method, and what this cannot tell you — AL Pulse"
+  active="areas"
+  description="How the AL Pulse figures are produced, and the things they cannot answer."
+>
+  <h1>Method, and what this cannot tell you</h1>
+  <p class="lede">
+    The useful question about a dashboard is not whether it has errors but
+    whether anyone is looking for them. These are the ones found so far.
+  </p>
+
+  <h2>Where the numbers come from</h2>
+  <p>
+    Every figure derives from the Registo Nacional de Turismo's public register
+    of Alojamento Local. The register is scraped month by month back to 2007,
+    transformed with dbt into DuckDB, and rendered here at build time. Nothing
+    on this site queries anything at read time.
+  </p>
+  <p>
+    Two facts are recorded per registration: when it was registered, and whether
+    it was still on the register the last time we looked. Everything else is
+    derived from those.
+  </p>
+
+  <h2>The register has been pulled {m.observed_months.length} times</h2>
+  <p>
+    This is the single most important caveat, and it shapes every chart of
+    losses. A registration that has gone can only be detected by comparing two
+    consecutive pulls — so the first month any loss is visible at all is
+    <strong>{monthLabel(m.loss_observable_from)}</strong>, one month after the
+    first pull. Before that the loss series is not zero; it is unknown, and the
+    charts leave it blank rather than draw a flat line implying that nothing
+    ever lapsed.
+  </p>
+  {
+    gaps.length > 0 && (
+      <p>
+        There is also a gap. The register was not pulled between{' '}
+        <strong>{monthLabel(gaps[0]!)}</strong> and{' '}
+        <strong>{monthLabel(gaps[gaps.length - 1]!)}</strong> — {gaps.length} months.
+        Every licence that lapsed in that window is attributed to{' '}
+        {monthLabel(m.data_through)}, because that is when it was first seen to
+        be missing. The decline was gradual; the chart shows it as a cliff. Read
+        the step as "this is what we found when we next looked", not as an event
+        in that month.
+      </p>
+    )
+  }
+  <p class="small faint">
+    Pulls so far: {m.observed_months.map(monthLabel).join(' · ')}.
+  </p>
+
+  <h2>What a "total" counts</h2>
+  <p>
+    The running total is registrations dated on or before a given month that are
+    still on the register, less those seen to have gone. Its shape is reliable;
+    its level is exact only at a pull month. Where this site names a peak, it
+    takes the peak over pull months only — a maximum inside an unobserved
+    stretch would be an artefact of when we looked.
+  </p>
+
+  <h2>What is excluded</h2>
+  <ul>
+    <li>
+      <strong>The Azores.</strong> Their register is not maintained to the same
+      cadence, so all {m.counts.areas.toLocaleString('en-GB')} areas here are
+      mainland Portugal and Madeira. An Azorean locality has no page.
+    </li>
+    <li>
+      <strong>Areas the geography cannot place.</strong> A registration whose
+      postcode resolves to no known locality is counted nationally but appears
+      in no area. The postcode reference data is a fixed snapshot, so postcodes
+      issued since then do not resolve.
+    </li>
+  </ul>
+
+  <h2>Personal data the source withdrew</h2>
+  <p>
+    Until 2026-09 the public export carried the operator's name, tax number and
+    contact details. It no longer does — ten columns went. Nothing on this site
+    ever used them, and historical values are not shown.
+  </p>
+
+  <h2>Known open issues</h2>
+  <ul>
+    <li>
+      Roughly 800 registrations sit on postcodes absent from the reference data
+      and so are not placed on the map.
+    </li>
+    <li>
+      Losses in an unobserved month are attributed to the next pull, as above.
+    </li>
+  </ul>
+
+  <h2>Reading the charts</h2>
+  <ul>
+    <li>Every mark answers at the pointer — hover, tap or focus and use the arrow keys.</li>
+    <li>A change smaller than half a percentage point is rendered "no change" rather than a direction.</li>
+    <li>Bars start at zero; where an axis is truncated, it is labelled.</li>
+    <li>Colour never carries meaning alone — every series is also named.</li>
+  </ul>
+
+  <p>
+    Data through {monthLabel(m.data_through)}; site built {m.generated}. The
+    pipeline and this site are open source.
+    <a href={`${base}/`}>Back to the overview</a>.
+  </p>
+</Base>

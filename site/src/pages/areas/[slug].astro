@@ -1,0 +1,296 @@
+---
+import Base from '../../layouts/Base.astro';
+import Metric from '../../components/Metric.astro';
+import RoomMix from '../../components/RoomMix.astro';
+import TimeSeries from '../../components/TimeSeries.tsx';
+import GrowthExplorer from '../../components/GrowthExplorer.tsx';
+import SubareaMix from '../../components/SubareaMix.tsx';
+import AreaTable from '../../components/AreaTable.tsx';
+import {
+  areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
+  areaBySlug, observedPeak, lossStartIndex, unobservedIndices, type AreaRow,
+} from '../../lib/data';
+import { num0, pct1, monthLabel } from '../../lib/format';
+
+export function getStaticPaths() {
+  return areas().map((a) => ({ params: { slug: a.slug } }));
+}
+
+const { slug } = Astro.params;
+const a = areaBySlug(slug!)!;
+const d = shard(slug!);
+const m = meta();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const months = m.months;
+const last = months.length - 1;
+
+const isLocality = a.admin_type === 'locality';
+const isRegion = a.admin_type === 'region';
+
+const total = d.series.cum_c[last] ?? 0;
+const threeBack = Math.max(0, last - 36);
+const totalThen = d.series.cum_c[threeBack] ?? 0;
+const growth3y = totalThen ? total / totalThen - 1 : null;
+
+const alk = d.series.al_per_1000[last] ?? 0;
+const alkThen = d.series.al_per_1000[threeBack] ?? 0;
+const inhabPerAl = alk ? 1000 / alk : null;
+const inhabThen = alkThen ? 1000 / alkThen : null;
+const inhabChange = inhabPerAl && inhabThen ? inhabPerAl / inhabThen - 1 : null;
+
+const rankC = d.series.rank_c[last] ?? null;
+const rankCThen = d.series.rank_c[threeBack] ?? null;
+const rankR = d.series.rank_r[last] ?? null;
+const rankRThen = d.series.rank_r[threeBack] ?? null;
+const rankM = d.series.rank_m[last] ?? null;
+const rankMThen = d.series.rank_m[threeBack] ?? null;
+
+const lost = lostSummary(d.series);
+const evs = events().map((e) => ({ month: e.month, label: e.event_name }));
+
+// Peer population for the rank context line — a rank only means something
+// against the size of the set it ranks within.
+const peers = areas().filter((x) => x.admin_type === a.admin_type).length;
+
+const kids: AreaRow[] = childrenOf(a);
+const locs: AreaRow[] = isLocality ? [] : localitiesUnder(a);
+
+const toRow = (x: AreaRow) => ({
+  slug: x.slug,
+  name: x.name,
+  al_count: x.al_count,
+  inhabitants_per_al: x.inhabitants_per_al,
+  al_per_1000: x.al_per_1000,
+  rank_within_country: x.rank_within_country,
+  al_count_growth_pcnt: x.al_count_growth_pcnt,
+  rank_within_country_change: x.rank_within_country_change,
+});
+
+const backHref = d.parent ? `${base}/areas/${d.parent.slug}` : `${base}/`;
+const backLabel = d.parent ? d.parent.name : 'Overview';
+
+// Peak over observed months only — between pulls the series is interpolated
+// and its maximum is an artefact of when we looked.
+const pk = observedPeak(d.series.cum_c);
+const offPeak = pk.value ? total / pk.value - 1 : 0;
+const shrinking = pk.index < last && offPeak < -0.005;
+---
+
+<Base
+  title={`${d.full_name} — Alojamento Local`}
+  active="areas"
+  description={`${num0(total)} registered short-lets in ${d.full_name}, ${monthLabel(m.data_through)}.`}
+>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href={`${base}/`}>Portugal</a>
+    {d.parent_path && <> › <span>{d.parent_path}</span></>}
+    › <span aria-current="page">{d.name}</span>
+  </nav>
+
+  <h1>{d.full_name}</h1>
+  <p class="lede">
+    {
+      shrinking ? (
+        <>
+          {num0(total)} registered short-lets, {pct1(Math.abs(offPeak))} fewer
+          than at the last count before the decline ({num0(pk.value)} in{' '}
+          {monthLabel(pk.month)}).
+        </>
+      ) : (
+        <>{num0(total)} registered short-lets as of {monthLabel(m.data_through)}.</>
+      )
+    }
+    {d.population != null && <> Population {num0(d.population)}.</>}
+    {' '}<a href={backHref}>← {backLabel}</a>
+  </p>
+
+  <section class="grid" aria-label="Headline figures">
+    <Metric
+      title="Registered short-lets"
+      value={num0(total)}
+      change={growth3y}
+      changeLabel="over three years"
+    />
+    <Metric
+      title="Inhabitants per short-let"
+      value={inhabPerAl == null ? '—' : num0(inhabPerAl)}
+      change={inhabChange}
+      changeLabel="over three years"
+      note="Lower means denser: fewer residents for each registered let."
+    />
+    <Metric
+      title="Rank in Portugal"
+      value={rankC == null ? '—' : `${num0(rankC)}`}
+      context={`of ${num0(peers)} ${a.admin_type === 'region' ? 'districts' : a.admin_type === 'municipality' ? 'municipalities' : 'localities'}`}
+      rank={rankC != null && rankCThen != null ? rankC - rankCThen : null}
+      changeLabel="over three years"
+    />
+    {
+      !isRegion && (
+        <Metric
+          title="Rank in its district"
+          value={rankR == null ? '—' : `${num0(rankR)}`}
+          rank={rankR != null && rankRThen != null ? rankR - rankRThen : null}
+          changeLabel="over three years"
+        />
+      )
+    }
+    {
+      isLocality && (
+        <Metric
+          title="Rank in its municipality"
+          value={rankM == null ? '—' : `${num0(rankM)}`}
+          rank={rankM != null && rankMThen != null ? rankM - rankMThen : null}
+          changeLabel="over three years"
+        />
+      )
+    }
+    {
+      !isLocality && d.skew && (
+        <Metric
+          title="Localities holding half its ALs"
+          value={pct1(d.skew.locality_rank_pcnt)}
+          note={`${d.skew.locality_rank} localities hold 50% of everything registered here`}
+        />
+      )
+    }
+    {
+      !isLocality && d.skew && (
+        <Metric
+          title="Population living there"
+          value={pct1(d.skew.total_population_pcnt)}
+          note="Share of this area's population in those same localities"
+        />
+      )
+    }
+  </section>
+
+  <h2>Registrations over time</h2>
+  <figure>
+    <TimeSeries
+      client:load
+      months={months}
+      line={d.series.cum_c}
+      bars={d.series.c}
+      lineLabel="Total registered"
+      barLabel="New that month"
+      events={evs}
+      height={300}
+    />
+    <figcaption>
+      The line is the running total; bars are registrations added each month.
+      Dashed rules mark national policy changes.
+    </figcaption>
+  </figure>
+
+  <h2>Licences leaving the register</h2>
+  <section class="grid" aria-label="Lost licences">
+    <Metric
+      title="Lost last month"
+      value={num0(lost.lastMonth)}
+      note={`${monthLabel(m.data_through)} alone`}
+    />
+    <Metric
+      title="Lost year to date"
+      value={num0(lost.ytd)}
+      note={`Against ${num0(lost.prevYear)} in all of ${Number(m.data_through.slice(0, 4)) - 1}`}
+    />
+  </section>
+  {
+    (d.series.cum_lost[last] ?? 0) > 0 ? (
+      <figure>
+        <TimeSeries
+          client:visible
+          months={months}
+          line={d.series.cum_lost}
+          bars={d.series.lost}
+          lineLabel="Lost, cumulative"
+          barLabel="Lost that month"
+          events={evs}
+          height={260}
+          startIndex={lossStartIndex()}
+          unobserved={unobservedIndices()}
+        />
+        <figcaption>
+          Losses are only visible between two pulls of the register, so this
+          starts at {monthLabel(m.loss_observable_from)}. The gap with no pull is
+          left blank rather than drawn as zero.
+        </figcaption>
+      </figure>
+    ) : (
+      <p class="muted small">
+        No registration here has been seen to leave the register since
+        {monthLabel(m.loss_observable_from)}, which is as far back as losses
+        can be detected.
+      </p>
+    )
+  }
+
+  <h2>Growth, against a month you choose</h2>
+  <p>
+    Every line starts at 100% in the base month, so they compare regardless of
+    size. Drag the slider to move the base.
+  </p>
+  <figure>
+    <GrowthExplorer
+      client:visible
+      months={months}
+      hierarchy={d.hierarchy}
+      subareas={d.subareas}
+      events={evs}
+      height={330}
+    />
+  </figure>
+
+  {
+    !isLocality && d.subareas.length > 0 && (
+      <>
+        <h2>How the total splits</h2>
+        <figure>
+          <SubareaMix client:visible months={months} subareas={d.subareas} height={320} />
+          <figcaption>
+            Absolute totals show growth; the share view shows which subareas
+            gained ground, which growth alone hides.
+          </figcaption>
+        </figure>
+      </>
+    )
+  }
+
+  {
+    isRegion && kids.length > 0 && (
+      <>
+        <h2>Municipalities</h2>
+        <AreaTable client:visible rows={kids.map(toRow)} base={base} caption={`${kids.length} municipalities`} />
+      </>
+    )
+  }
+  {
+    !isRegion && !isLocality && kids.length > 0 && (
+      <>
+        <h2>Localities</h2>
+        <AreaTable client:visible rows={kids.map(toRow)} base={base} caption={`${kids.length} localities`} />
+      </>
+    )
+  }
+  {
+    isRegion && locs.length > 0 && (
+      <>
+        <h2>Every locality in {d.name}</h2>
+        <AreaTable client:visible rows={locs.map(toRow)} base={base} caption={`${locs.length} localities`} />
+      </>
+    )
+  }
+
+  {
+    d.rooms.length > 0 && (
+      <>
+        <h2>What size are they?</h2>
+        <RoomMix
+          rows={d.rooms}
+          caption={`Room mix in ${d.name}, against the levels above it.`}
+        />
+      </>
+    )
+  }
+</Base>

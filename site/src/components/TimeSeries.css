@@ -1,0 +1,114 @@
+.ts-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.ts-svg {
+  display: block;
+  width: 100%;
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+.ts-svg:focus-visible {
+  outline: 2px solid var(--s-focus);
+  outline-offset: 2px;
+}
+
+.ts-grid {
+  stroke: var(--m-grid);
+  stroke-width: 1;
+}
+
+.ts-axis {
+  fill: var(--s-ink-faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ts-bar {
+  fill: var(--m-primary-soft);
+}
+
+.ts-line {
+  fill: none;
+  stroke: var(--m-primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.ts-event {
+  stroke: var(--s-rule-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.ts-event-label {
+  fill: var(--s-ink-faint);
+  font-size: 9.5px;
+  writing-mode: vertical-rl;
+}
+
+.ts-cursor line {
+  stroke: var(--s-ink-faint);
+  stroke-width: 1;
+}
+.ts-cursor circle {
+  fill: var(--m-primary);
+  stroke: var(--s-panel);
+  stroke-width: 2;
+}
+
+/* The readout goes to the pointer — not to a panel beside the chart, and
+ * absolutely not to a footer below it. */
+.ts-readout {
+  position: absolute;
+  top: 4px;
+  transform: translateX(8px);
+  background: var(--s-panel);
+  border: 1px solid var(--s-rule-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 14px var(--s-shadow);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.8rem;
+  pointer-events: none;
+  z-index: 5;
+  min-width: 11rem;
+}
+.ts-readout.is-flipped {
+  transform: translateX(calc(-100% - 8px));
+}
+
+/* On a narrow screen there is no room to place a box beside a mark without it
+ * running off one side, so it pins to the top edge instead. */
+.ts-readout.is-pinned {
+  left: 0;
+  right: 0;
+  transform: none;
+  min-width: 0;
+}
+
+.ts-readout-month {
+  font-weight: 640;
+  margin-bottom: 0.2rem;
+}
+.ts-readout-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ts-readout-row span {
+  color: var(--s-ink-soft);
+}
+.ts-readout-row b {
+  margin-left: auto;
+  font-weight: 620;
+}
+.ts-readout i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+.swatch-line { background: var(--m-primary); }
+.swatch-bar { background: var(--m-primary-soft); }

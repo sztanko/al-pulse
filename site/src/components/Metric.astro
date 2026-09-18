@@ -1,0 +1,90 @@
+---
+/** Metric tile: a headline number and how it has moved.
+ *
+ * The change carries a neutral band (see format.delta) so a rounding-scale
+ * move is rendered "no change" rather than as a coloured direction.
+ */
+import { delta, rankDelta, type Direction } from '../lib/format';
+
+interface Props {
+  title: string;
+  value: string;
+  /** Raw change; pass either this or `rank`. */
+  change?: number | null;
+  /** Rank movement — inverted, because ranks improve downward. */
+  rank?: number | null;
+  changeLabel?: string;
+  note?: string;
+  /** Small ranked-position line, e.g. "5th of 19". */
+  context?: string;
+}
+
+const { title, value, change, rank, changeLabel, note, context } = Astro.props;
+
+let d: { text: string; dir: Direction } | null = null;
+if (rank !== undefined && rank !== null) d = rankDelta(rank);
+else if (change !== undefined && change !== null) d = delta(change);
+---
+
+<div class="metric">
+  <div class="metric-title">{title}</div>
+  <div class="metric-value num">{value}</div>
+  {context && <div class="metric-context num">{context}</div>}
+  {
+    d && (
+      <div class:list={['metric-delta', `dir-${d.dir}`]}>
+        <span class="num">{d.text}</span>
+        {changeLabel && <span class="metric-delta-label">{changeLabel}</span>}
+      </div>
+    )
+  }
+  {note && <div class="metric-note">{note}</div>}
+</div>
+
+<style>
+  .metric {
+    background: var(--s-panel);
+    border: 1px solid var(--s-rule);
+    border-radius: var(--radius);
+    padding: 0.85rem 0.95rem 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+  .metric-title {
+    font-size: 0.82rem;
+    color: var(--s-ink-soft);
+    line-height: 1.3;
+  }
+  .metric-value {
+    font-size: clamp(1.5rem, 1.2rem + 1.1vw, 2rem);
+    font-weight: 640;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    /* A long number must not widen the page. */
+    overflow-wrap: anywhere;
+  }
+  .metric-context {
+    font-size: 0.8rem;
+    color: var(--s-ink-faint);
+  }
+  .metric-delta {
+    font-size: 0.83rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    margin-top: 0.15rem;
+  }
+  .dir-up { color: var(--m-positive); }
+  .dir-down { color: var(--m-negative); }
+  .dir-flat { color: var(--s-ink-faint); }
+  .metric-delta-label { color: var(--s-ink-faint); }
+  .metric-note {
+    font-size: 0.78rem;
+    color: var(--s-ink-faint);
+    margin-top: 0.25rem;
+    line-height: 1.35;
+  }
+</style>
