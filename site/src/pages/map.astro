@@ -20,11 +20,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     use the buttons to zoom, and hover or tap any locality to open it.
   </p>
 
-  <Choropleth client:load geoUrl={`${base}/geo/localities.json`} base={base} />
+  {/* client:only — MapLibre touches `window` at import, so it must never be
+      rendered on the server. */}
+  <Choropleth client:only="react" geoUrl={`${base}/geo/localities.json`} base={base} />
 
   <p class="small faint" style="margin-top:0.8rem">
     Colour bins are quantiles, so each shade holds the same number of
     localities — that keeps the ramp readable when a handful of places dwarf
-    everywhere else. Localities with no value are drawn flat.
+    everywhere else. Basemap by
+    <a href="https://openfreemap.org">OpenFreeMap</a> from
+    <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> data:
+    vector tiles served without an API key, and the only page on this site that
+    loads a map library.
   </p>
 </Base>

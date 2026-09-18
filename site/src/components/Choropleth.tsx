@@ -1,16 +1,20 @@
-/** Every locality in Portugal, drawn from the geometry itself.
+/** Every locality in Portugal over a real vector basemap.
  *
- * Canvas rather than 2,471 DOM nodes: past a few thousand marks layout cost
- * stops being invisible, and pan/zoom has to stay at frame rate. Hit-testing
- * is a second, offscreen canvas painted with one unique colour per feature, so
- * "which polygon is under the pointer" is a single pixel read rather than a
- * point-in-polygon sweep.
+ * MapLibre GL, as madeira-pass uses — but pointed at OpenFreeMap rather than
+ * CARTO. CARTO's basemaps need a key for production use, which is exactly what
+ * put "API KEY REQUIRED" across the whole country on the Evidence map.
+ * OpenFreeMap serves OpenMapTiles-schema vector tiles, glyphs and sprites with
+ * no key, no signup and no quota, and ships both a light and a dark style from
+ * the same source so the map can follow the page theme.
  *
- * No basemap tiles. Evidence pulled CARTO tiles and rendered an "API KEY
- * REQUIRED" watermark across the whole country on the live site; the polygons
- * are the data, and they carry themselves.
+ * The choropleth is a fill layer over that basemap, coloured by a `step`
+ * expression over quantile breaks computed from the data at load. Hit-testing
+ * is MapLibre's own `queryRenderedFeatures`, and hover state rides on
+ * feature-state so no layer is rebuilt per pointer move.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import maplibregl, { type Map as MLMap, type StyleSpecification } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import './Choropleth.css';
 
 type Metric = 'rank_within_country' | 'al_count' | 'people_per_al';
@@ -18,11 +22,10 @@ type Metric = 'rank_within_country' | 'al_count' | 'people_per_al';
 interface Props {
   geoUrl: string;
   base: string;
-  /** Ramp tokens, light → dark. */
   steps?: number;
 }
 
-interface Feat {
+interface Hovered {
   slug: string;
   name: string;
   full: string;
@@ -30,346 +33,338 @@ interface Feat {
   rank: number | null;
   ppa: number | null;
   pop: number | null;
-  rings: Float64Array[];
-  bbox: [number, number, number, number];
+  x: number;
+  y: number;
 }
 
-const METRICS: { key: Metric; label: string; hint: string; invert: boolean }[] = [
-  { key: 'rank_within_country', label: 'Rank by ALs', hint: 'darker = higher rank', invert: true },
-  { key: 'al_count', label: 'Number of ALs', hint: 'darker = more', invert: false },
-  { key: 'people_per_al', label: 'Residents per AL', hint: 'darker = denser', invert: true },
+/** `lo`/`hi` label the ends of the ramp. "Darker" would be wrong in one theme
+ * or the other: the light ramp runs pale -> deep red and the dark ramp runs
+ * near-black -> bright apricot. Both run subtle -> strong, so the legend is
+ * written in those terms and the ends say which is which. */
+const METRICS: {
+  key: Metric; label: string; hint: string; invert: boolean; lo: string; hi: string;
+}[] = [
+  {
+    key: 'rank_within_country', label: 'Rank by ALs', invert: true,
+    hint: 'stronger colour = higher up the national ranking',
+    lo: 'lowest ranked', hi: 'rank 1',
+  },
+  {
+    key: 'al_count', label: 'Number of ALs', invert: false,
+    hint: 'stronger colour = more registrations',
+    lo: 'fewest', hi: 'most',
+  },
+  {
+    key: 'people_per_al', label: 'Residents per AL', invert: true,
+    hint: 'stronger colour = denser (fewer residents per registration)',
+    lo: 'least dense', hi: 'densest',
+  },
 ];
 
-/** Longitudes west of this are the Madeira archipelago, not the mainland. */
-const MAINLAND_W = -12;
+const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+
+const MAINLAND: [number, number, number, number] = [-9.6, 36.9, -6.1, 42.2];
+const MADEIRA: [number, number, number, number] = [-17.3, 32.6, -16.2, 33.15];
+
+const SRC = 'localities';
+const FILL = 'localities-fill';
+const LINE = 'localities-line';
+const HOVER = 'localities-hover';
 
 const n0 = (v: number | null) => (v == null ? '—' : Math.round(v).toLocaleString('en-GB'));
 
-export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const cvsRef = useRef<HTMLCanvasElement | null>(null);
-  const pickRef = useRef<HTMLCanvasElement | null>(null);
-  const [feats, setFeats] = useState<Feat[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [metric, setMetric] = useState<Metric>('rank_within_country');
-  const [size, setSize] = useState({ w: 900, h: 640 });
-  const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const [pointer, setPointer] = useState({ x: 0, y: 0 });
-  const [pinned, setPinned] = useState(false);
-  const rampRef = useRef<string[]>([]);
-  const dragRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+const isDark = () => {
+  const attr = document.documentElement.getAttribute('data-theme');
+  if (attr === 'dark') return true;
+  if (attr === 'light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+};
 
-  /* ----------------------------------------------------------- load + fit */
+const rampVars = (steps: number): string[] => {
+  const cs = getComputedStyle(document.documentElement);
+  return Array.from({ length: steps }, (_, i) =>
+    cs.getPropertyValue(`--m-seq-${i + 1}`).trim() || '#ccc'
+  );
+};
+
+export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
+  const holderRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MLMap | null>(null);
+  const hoverIdRef = useRef<number | string | null>(null);
+  const pinnedRef = useRef(false);
+
+  const [metric, setMetric] = useState<Metric>('rank_within_country');
+  const [hovered, setHovered] = useState<Hovered | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  const breaksRef = useRef<Record<Metric, number[]>>({
+    rank_within_country: [],
+    al_count: [],
+    people_per_al: [],
+  });
+
+  /** Quantile breaks, so each shade holds the same number of localities — a
+   * handful of places otherwise dwarf the rest and the ramp goes unused. */
+  const computeBreaks = useCallback(
+    (features: GeoJSON.Feature[]) => {
+      const out = {} as Record<Metric, number[]>;
+      for (const m of METRICS) {
+        const vals = features
+          .map((f) => f.properties?.[m.key])
+          .filter((v): v is number => typeof v === 'number')
+          .sort((a, b) => a - b);
+        const cuts: number[] = [];
+        for (let i = 1; i < steps; i++) {
+          const v = vals[Math.floor((i / steps) * vals.length)];
+          if (typeof v === 'number') cuts.push(v);
+        }
+        // `step` needs strictly ascending stops; ties would throw.
+        out[m.key] = cuts.filter((v, i, a) => i === 0 || v > (a[i - 1] ?? -Infinity));
+      }
+      return out;
+    },
+    [steps]
+  );
+
+  const fillExpression = useCallback(
+    (m: Metric): unknown => {
+      const ramp = rampVars(steps);
+      const cuts = breaksRef.current[m] ?? [];
+      const inv = METRICS.find((x) => x.key === m)?.invert ?? false;
+      const shade = (i: number) => ramp[inv ? ramp.length - 1 - i : i] ?? ramp[0] ?? '#ccc';
+      if (!cuts.length) return shade(0);
+      const expr: unknown[] = ['step', ['to-number', ['get', m], -1], shade(0)];
+      cuts.forEach((c, i) => expr.push(c, shade(Math.min(i + 1, ramp.length - 1))));
+      return expr;
+    },
+    [steps]
+  );
+
+  /** Add our own layers on top of whichever basemap style is loaded. */
+  const addLayers = useCallback(
+    (map: MLMap, data: GeoJSON.FeatureCollection) => {
+      if (!map.getSource(SRC)) {
+        map.addSource(SRC, { type: 'geojson', data, promoteId: 'id' });
+      }
+      const dark = isDark();
+      if (!map.getLayer(FILL)) {
+        map.addLayer({
+          id: FILL,
+          type: 'fill',
+          source: SRC,
+          paint: {
+            'fill-color': fillExpression(metric) as never,
+            'fill-opacity': [
+              'case',
+              ['boolean', ['feature-state', 'hover'], false],
+              0.95,
+              0.72,
+            ] as never,
+          },
+        });
+      }
+      if (!map.getLayer(LINE)) {
+        map.addLayer({
+          id: LINE,
+          type: 'line',
+          source: SRC,
+          paint: {
+            'line-color': dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.16)',
+            'line-width': 0.4,
+          },
+        });
+      }
+      if (!map.getLayer(HOVER)) {
+        map.addLayer({
+          id: HOVER,
+          type: 'line',
+          source: SRC,
+          paint: {
+            'line-color': dark ? '#fff' : '#111',
+            'line-width': [
+              'case',
+              ['boolean', ['feature-state', 'hover'], false],
+              2,
+              0,
+            ] as never,
+          },
+        });
+      }
+    },
+    [fillExpression, metric]
+  );
+
+  /* ------------------------------------------------------------------ init */
   useEffect(() => {
-    let alive = true;
-    fetch(geoUrl)
+    const holder = holderRef.current;
+    if (!holder || mapRef.current) return;
+
+    setNarrow(holder.clientWidth < 560);
+
+    const map = new maplibregl.Map({
+      container: holder,
+      style: (isDark() ? DARK_STYLE : LIGHT_STYLE) as unknown as StyleSpecification,
+      bounds: MAINLAND,
+      fitBoundsOptions: { padding: 24 },
+      attributionControl: false,
+      // Keep the interaction simple: this is a choropleth, not a flight sim.
+      pitchWithRotate: false,
+      dragRotate: false,
+      touchZoomRotate: true,
+    });
+    mapRef.current = map;
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    // No customAttribution: the OpenFreeMap style already declares OpenFreeMap,
+    // OpenMapTiles and OpenStreetMap. Adding our own duplicated all three and,
+    // at 360px, the two halves of the bar overlapped each other — the verifier
+    // caught it as a link covered by a link.
+    map.addControl(new maplibregl.AttributionControl({ compact: true }));
+
+    let data: GeoJSON.FeatureCollection | null = null;
+
+    map.on('error', (e) => {
+      const msg = String((e as { error?: Error }).error ?? e);
+      // Missing glyphs for one label are not worth failing the page over.
+      if (/font|glyph|sprite/i.test(msg)) return;
+      setErr(msg.slice(0, 160));
+    });
+
+    const load = fetch(geoUrl)
       .then((r) => {
         if (!r.ok) throw new Error(`geometry ${r.status}`);
         return r.json();
       })
-      .then((gj) => {
-        if (!alive) return;
-        const out: Feat[] = [];
-        for (const f of gj.features ?? []) {
-          const p = f.properties ?? {};
-          const polys =
-            f.geometry?.type === 'Polygon'
-              ? [f.geometry.coordinates]
-              : f.geometry?.type === 'MultiPolygon'
-                ? f.geometry.coordinates
-                : [];
-          const rings: Float64Array[] = [];
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          for (const poly of polys) {
-            for (const ring of poly) {
-              const arr = new Float64Array(ring.length * 2);
-              for (let i = 0; i < ring.length; i++) {
-                const lon = ring[i][0];
-                const lat = ring[i][1];
-                arr[i * 2] = lon;
-                arr[i * 2 + 1] = lat;
-                if (lon < minX) minX = lon;
-                if (lon > maxX) maxX = lon;
-                if (lat < minY) minY = lat;
-                if (lat > maxY) maxY = lat;
-              }
-              rings.push(arr);
-              break; // outer ring only: holes are invisible at this scale
-            }
-          }
-          if (!rings.length) continue;
-          out.push({
-            slug: p.slug,
-            name: p.name,
-            full: p.full_name,
-            al: p.al_count ?? null,
-            rank: p.rank_within_country ?? null,
-            ppa: p.people_per_al ?? null,
-            pop: p.population ?? null,
-            rings,
-            bbox: [minX, minY, maxX, maxY],
-          });
-        }
-        setFeats(out);
+      .then((gj: GeoJSON.FeatureCollection) => {
+        data = gj;
+        breaksRef.current = computeBreaks(gj.features ?? []);
       })
-      .catch((e) => alive && setErr(String(e)));
-    return () => {
-      alive = false;
-    };
-  }, [geoUrl]);
+      .catch((e) => setErr(String(e).slice(0, 160)));
 
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const w = el.clientWidth || 900;
-      setSize({ w, h: Math.max(380, Math.min(760, Math.round(w * 1.05))) });
+    map.on('load', async () => {
+      await load;
+      if (!data) return;
+      addLayers(map, data);
+      setReady(true);
     });
-    ro.observe(el);
-    const w = el.clientWidth || 900;
-    setSize({ w, h: Math.max(380, Math.min(760, Math.round(w * 1.05))) });
-    return () => ro.disconnect();
-  }, []);
 
-  /** Read the ramp out of CSS so it follows the theme. */
-  useEffect(() => {
-    const read = () => {
-      const cs = getComputedStyle(document.documentElement);
-      rampRef.current = Array.from({ length: steps }, (_, i) =>
-        cs.getPropertyValue(`--m-seq-${i + 1}`).trim()
-      );
-      setView((v) => ({ ...v })); // force a repaint with the new palette
+    // Re-add our layers after a basemap style swap: setStyle discards them.
+    map.on('styledata', () => {
+      if (!data || !map.isStyleLoaded()) return;
+      if (!map.getLayer(FILL)) addLayers(map, data);
+    });
+
+    const move = (e: maplibregl.MapMouseEvent) => {
+      if (pinnedRef.current) return;
+      const hits = map.queryRenderedFeatures(e.point, { layers: [FILL] });
+      const f = hits[0];
+      if (!f) {
+        if (hoverIdRef.current != null) {
+          map.setFeatureState({ source: SRC, id: hoverIdRef.current }, { hover: false });
+          hoverIdRef.current = null;
+        }
+        setHovered(null);
+        return;
+      }
+      if (hoverIdRef.current !== f.id) {
+        if (hoverIdRef.current != null)
+          map.setFeatureState({ source: SRC, id: hoverIdRef.current }, { hover: false });
+        hoverIdRef.current = f.id ?? null;
+        if (hoverIdRef.current != null)
+          map.setFeatureState({ source: SRC, id: hoverIdRef.current }, { hover: true });
+      }
+      const p = f.properties ?? {};
+      setHovered({
+        slug: String(p.slug ?? ''),
+        name: String(p.name ?? ''),
+        full: String(p.full_name ?? ''),
+        al: typeof p.al_count === 'number' ? p.al_count : Number(p.al_count) || null,
+        rank:
+          typeof p.rank_within_country === 'number'
+            ? p.rank_within_country
+            : Number(p.rank_within_country) || null,
+        ppa: typeof p.people_per_al === 'number' ? p.people_per_al : Number(p.people_per_al) || null,
+        pop: typeof p.population === 'number' ? p.population : Number(p.population) || null,
+        x: e.point.x,
+        y: e.point.y,
+      });
     };
-    read();
-    const mo = new MutationObserver(read);
+
+    map.on('mousemove', FILL, move);
+    map.on('mouseleave', FILL, () => {
+      if (pinnedRef.current) return;
+      if (hoverIdRef.current != null)
+        map.setFeatureState({ source: SRC, id: hoverIdRef.current }, { hover: false });
+      hoverIdRef.current = null;
+      setHovered(null);
+    });
+
+    // Touch: a tap opens the readout and it stays until the next tap elsewhere.
+    map.on('click', FILL, (e) => {
+      move(e);
+      pinnedRef.current = true;
+      setTimeout(() => {
+        const off = () => {
+          pinnedRef.current = false;
+          setHovered(null);
+          document.removeEventListener('pointerdown', off, true);
+        };
+        document.addEventListener('pointerdown', off, true);
+      }, 80);
+    });
+
+    // The first fitBounds runs against the container's pre-layout size, which
+    // left Portugal sitting right of centre. Re-fit once, after the element has
+    // settled at its real width.
+    let refitted = false;
+    const ro = new ResizeObserver(() => {
+      setNarrow(holder.clientWidth < 560);
+      map.resize();
+      if (!refitted && holder.clientWidth > 0) {
+        refitted = true;
+        map.fitBounds(MAINLAND, { padding: 24, duration: 0 });
+      }
+    });
+    ro.observe(holder);
+
+    return () => {
+      ro.disconnect();
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [geoUrl, addLayers, computeBreaks]);
+
+  /* ------------------------------------------------------ theme + metric */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const swap = () => map.setStyle((isDark() ? DARK_STYLE : LIGHT_STYLE) as unknown as StyleSpecification);
+    const mo = new MutationObserver(swap);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    mq.addEventListener('change', read);
+    mq.addEventListener('change', swap);
     return () => {
       mo.disconnect();
-      mq.removeEventListener('change', read);
+      mq.removeEventListener('change', swap);
     };
-  }, [steps]);
-
-  /* ---------------------------------------------------------- projection */
-  const fit = useMemo(() => {
-    if (!feats?.length) return null;
-    // Frame the mainland. Madeira lies about eight degrees further west, and a
-    // bbox spanning both spends most of the canvas on empty Atlantic and
-    // shrinks the part nearly every reader came for. Madeira is still drawn,
-    // and the region buttons fly to it.
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const f of feats) {
-      if (f.bbox[0] < MAINLAND_W) continue;
-      if (f.bbox[0] < minX) minX = f.bbox[0];
-      if (f.bbox[1] < minY) minY = f.bbox[1];
-      if (f.bbox[2] > maxX) maxX = f.bbox[2];
-      if (f.bbox[3] > maxY) maxY = f.bbox[3];
-    }
-    // Equirectangular with a cos(lat) correction — adequate over one country
-    // and far cheaper than a full projection.
-    const midLat = ((minY + maxY) / 2) * (Math.PI / 180);
-    const kx = Math.cos(midLat);
-    const w = (maxX - minX) * kx;
-    const h = maxY - minY;
-    return { minX, minY, maxX, maxY, kx, w, h };
-  }, [feats]);
-
-  /** Quantile bins, so the ramp uses its whole range whatever the shape. */
-  const bins = useMemo(() => {
-    if (!feats?.length) return null;
-    const vals = feats
-      .map((f) => (metric === 'al_count' ? f.al : metric === 'people_per_al' ? f.ppa : f.rank))
-      .filter((v): v is number => v != null)
-      .sort((a, b) => a - b);
-    if (!vals.length) return null;
-    const cuts: number[] = [];
-    for (let i = 1; i < steps; i++) cuts.push(vals[Math.floor((i / steps) * vals.length)] ?? 0);
-    return cuts;
-  }, [feats, metric, steps]);
-
-  const binOf = useCallback(
-    (f: Feat): number => {
-      const v = metric === 'al_count' ? f.al : metric === 'people_per_al' ? f.ppa : f.rank;
-      if (v == null || !bins) return -1;
-      let i = 0;
-      while (i < bins.length && v > (bins[i] ?? 0)) i++;
-      const invert = METRICS.find((m) => m.key === metric)?.invert ?? false;
-      return invert ? steps - 1 - i : i;
-    },
-    [metric, bins, steps]
-  );
-
-  /* -------------------------------------------------------------- render */
-  const draw = useCallback(() => {
-    const cvs = cvsRef.current;
-    const pick = pickRef.current;
-    if (!cvs || !pick || !feats || !fit) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const { w, h } = size;
-    for (const cc of [cvs, pick]) {
-      cc.width = Math.round(w * dpr);
-      cc.height = Math.round(h * dpr);
-    }
-    cvs.style.width = `${w}px`;
-    cvs.style.height = `${h}px`;
-
-    const ctx = cvs.getContext('2d');
-    const pctx = pick.getContext('2d', { willReadFrequently: true });
-    if (!ctx || !pctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    pctx.clearRect(0, 0, w, h);
-
-    const pad = 10;
-    const s = Math.min((w - pad * 2) / fit.w, (h - pad * 2) / fit.h) * view.k;
-    const ox = (w - fit.w * s) / 2 + view.tx;
-    const oy = (h - fit.h * s) / 2 + view.ty;
-    const X = (lon: number) => ox + (lon - fit.minX) * fit.kx * s;
-    const Y = (lat: number) => oy + (fit.maxY - lat) * s;
-
-    const ramp = rampRef.current;
-    const cs = getComputedStyle(document.documentElement);
-    const stroke = cs.getPropertyValue('--s-panel').trim() || '#fff';
-    const noData = cs.getPropertyValue('--s-panel-2').trim() || '#eee';
-
-    ctx.lineJoin = 'round';
-    feats.forEach((f, idx) => {
-      const b = binOf(f);
-      ctx.beginPath();
-      pctx.beginPath();
-      for (const ring of f.rings) {
-        for (let i = 0; i < ring.length; i += 2) {
-          const px = X(ring[i]!);
-          const py = Y(ring[i + 1]!);
-          if (i === 0) {
-            ctx.moveTo(px, py);
-            pctx.moveTo(px, py);
-          } else {
-            ctx.lineTo(px, py);
-            pctx.lineTo(px, py);
-          }
-        }
-        ctx.closePath();
-        pctx.closePath();
-      }
-      ctx.fillStyle = b < 0 ? noData : (ramp[b] ?? noData);
-      ctx.fill();
-      if (s > 0.9) {
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = idx === hoverIdx ? 2 : 0.35;
-        ctx.stroke();
-      }
-      // id+1 encoded as rgb, so 0,0,0 reads as "nothing here".
-      const id = idx + 1;
-      pctx.fillStyle = `rgb(${id & 255},${(id >> 8) & 255},${(id >> 16) & 255})`;
-      pctx.fill();
-    });
-
-    if (hoverIdx != null && feats[hoverIdx]) {
-      const f = feats[hoverIdx];
-      ctx.beginPath();
-      for (const ring of f.rings) {
-        for (let i = 0; i < ring.length; i += 2) {
-          const px = X(ring[i]!);
-          const py = Y(ring[i + 1]!);
-          i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-      }
-      ctx.strokeStyle = cs.getPropertyValue('--s-ink').trim() || '#000';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-    }
-  }, [feats, fit, size, view, binOf, hoverIdx]);
-
-  useEffect(() => {
-    draw();
-  }, [draw]);
-
-  /* --------------------------------------------------------- interaction */
-  const hitAt = useCallback((clientX: number, clientY: number): number | null => {
-    const pick = pickRef.current;
-    if (!pick) return null;
-    const r = pick.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const x = Math.round((clientX - r.left) * dpr);
-    const y = Math.round((clientY - r.top) * dpr);
-    if (x < 0 || y < 0 || x >= pick.width || y >= pick.height) return null;
-    const ctx = pick.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return null;
-    const d = ctx.getImageData(x, y, 1, 1).data;
-    const id = (d[0] ?? 0) | ((d[1] ?? 0) << 8) | ((d[2] ?? 0) << 16);
-    return id > 0 ? id - 1 : null;
   }, []);
 
   useEffect(() => {
-    if (!pinned) return;
-    let armed = false;
-    const t = setTimeout(() => (armed = true), 90);
-    const off = () => { if (armed) { setPinned(false); setHoverIdx(null); } };
-    document.addEventListener('pointerdown', off, true);
-    return () => { clearTimeout(t); document.removeEventListener('pointerdown', off, true); };
-  }, [pinned]);
+    const map = mapRef.current;
+    if (!map || !ready || !map.getLayer(FILL)) return;
+    map.setPaintProperty(FILL, 'fill-color', fillExpression(metric) as never);
+  }, [metric, ready, fillExpression]);
 
-  const onMove = (e: React.PointerEvent) => {
-    const d = dragRef.current;
-    if (d) {
-      setView((v) => ({ ...v, tx: d.tx + (e.clientX - d.x), ty: d.ty + (e.clientY - d.y) }));
-      return;
-    }
-    if (pinned && e.pointerType === 'touch') return;
-    setPointer({ x: e.clientX, y: e.clientY });
-    setHoverIdx(hitAt(e.clientX, e.clientY));
-  };
+  const flyTo = (b: [number, number, number, number]) =>
+    mapRef.current?.fitBounds(b, { padding: 24, duration: 700 });
 
-  const zoomBy = (factor: number) =>
-    setView((v) => ({ ...v, k: Math.max(1, Math.min(14, v.k * factor)) }));
-
-  /** Centre on Madeira, expressed in the mainland projection so the same
-   * transform drives both the visible and the hit-test canvas. */
-  const madeiraView = useCallback(() => {
-    if (!feats || !fit) return { k: 1, tx: 0, ty: 0 };
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const f of feats) {
-      if (f.bbox[0] >= MAINLAND_W) continue;
-      if (f.bbox[0] < minX) minX = f.bbox[0];
-      if (f.bbox[1] < minY) minY = f.bbox[1];
-      if (f.bbox[2] > maxX) maxX = f.bbox[2];
-      if (f.bbox[3] > maxY) maxY = f.bbox[3];
-    }
-    if (!Number.isFinite(minX)) return { k: 1, tx: 0, ty: 0 };
-    const { w, h } = size;
-    const pad = 10;
-    const base = Math.min((w - pad * 2) / fit.w, (h - pad * 2) / fit.h);
-    const k = Math.max(
-      1,
-      Math.min(14, Math.min(fit.w / ((maxX - minX) * fit.kx), fit.h / (maxY - minY)) * 0.55)
-    );
-    const s2 = base * k;
-    const cx = ((minX + maxX) / 2 - fit.minX) * fit.kx * s2;
-    const cy = (fit.maxY - (minY + maxY) / 2) * s2;
-    return {
-      k,
-      tx: w / 2 - cx - (w - fit.w * s2) / 2,
-      ty: h / 2 - cy - (h - fit.h * s2) / 2,
-    };
-  }, [feats, fit, size]);
-
-  const hovered = hoverIdx != null && feats ? feats[hoverIdx] : null;
-  const wrapBox = wrapRef.current?.getBoundingClientRect();
-  const narrow = size.w < 560;
-
-  if (err) {
-    return (
-      <p className="muted">
-        The map geometry could not be loaded ({err}). Every locality is still
-        listed on the <a href={`${base}/areas`}>areas index</a>.
-      </p>
-    );
-  }
+  const active = useMemo(
+    () => METRICS.find((m) => m.key === metric) ?? METRICS[0]!,
+    [metric]
+  );
+  const hint = active.hint;
 
   return (
     <div className="ch">
@@ -387,63 +382,48 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
             </button>
           ))}
         </div>
-        <div className="ch-zoom" role="group" aria-label="View">
-          <button type="button" onClick={() => setView({ k: 1, tx: 0, ty: 0 })}>Mainland</button>
-          <button type="button" onClick={() => setView(madeiraView())}>Madeira</button>
-          <button type="button" onClick={() => zoomBy(1.4)} aria-label="Zoom in">+</button>
-          <button type="button" onClick={() => zoomBy(1 / 1.4)} aria-label="Zoom out">−</button>
+        <div className="ch-zoom" role="group" aria-label="Jump to">
+          <button type="button" onClick={() => flyTo(MAINLAND)}>Mainland</button>
+          <button type="button" onClick={() => flyTo(MADEIRA)}>Madeira</button>
         </div>
       </div>
 
       <div className="ch-legend">
-        <span className="small faint">{METRICS.find((mm) => mm.key === metric)?.hint}</span>
-        <span className="ch-ramp" aria-hidden="true">
-          {Array.from({ length: steps }, (_, i) => (
-            <i key={i} style={{ background: `var(--m-seq-${i + 1})` }} />
-          ))}
+        <span className="small faint">{hint}</span>
+        <span className="ch-scale">
+          <span className="small faint">{active.lo}</span>
+          <span className="ch-ramp" aria-hidden="true">
+            {Array.from({ length: steps }, (_, i) => (
+              <i key={i} style={{ background: `var(--m-seq-${i + 1})` }} />
+            ))}
+          </span>
+          <span className="small faint">{active.hi}</span>
         </span>
       </div>
 
-      <div className="ch-stage" ref={wrapRef}>
-        <canvas
-          ref={cvsRef}
-          className="ch-canvas"
-          role="img"
-          aria-label={`Choropleth of ${feats?.length ?? 0} Portuguese localities coloured by ${
-            METRICS.find((mm) => mm.key === metric)?.label
-          }`}
-          onPointerMove={onMove}
-          onPointerLeave={(e) => {
-            if (e.pointerType === 'touch') return;
-            setHoverIdx(null);
-          }}
-          onPointerDown={(e) => {
-            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-            if (e.pointerType === 'touch') {
-              setPointer({ x: e.clientX, y: e.clientY });
-              setHoverIdx(hitAt(e.clientX, e.clientY));
-              setPinned(true);
-            }
-            dragRef.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
-          }}
-          onPointerUp={() => (dragRef.current = null)}
-          onWheel={(e) => {
-            if (!e.ctrlKey && Math.abs(e.deltaY) < 2) return;
-            zoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12);
-          }}
+      <div className="ch-stage">
+        <div
+          ref={holderRef}
+          className="ch-map"
+          role="application"
+          aria-label="Map of Portuguese localities by registered short-lets"
         />
-        <canvas ref={pickRef} className="ch-pick" aria-hidden="true" />
 
-        {hovered && wrapBox && (
+        {err && (
+          <p className="ch-loading muted">
+            The map could not load ({err}). Every locality is still listed on the{' '}
+            <a href={`${base}/areas`}>areas index</a>.
+          </p>
+        )}
+        {!ready && !err && <p className="ch-loading muted">Loading the map…</p>}
+
+        {hovered && (
           <div
             className={`ch-readout${narrow ? ' is-pinned' : ''}`}
             style={
               narrow
                 ? undefined
-                : {
-                    left: `${Math.min(pointer.x - wrapBox.left + 14, size.w - 230)}px`,
-                    top: `${Math.max(8, pointer.y - wrapBox.top - 10)}px`,
-                  }
+                : { left: `${hovered.x + 14}px`, top: `${Math.max(8, hovered.y - 10)}px` }
             }
             role="status"
           >
@@ -455,11 +435,9 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
               <div><dt>Residents per AL</dt><dd className="num">{n0(hovered.ppa)}</dd></div>
               <div><dt>Population</dt><dd className="num">{n0(hovered.pop)}</dd></div>
             </dl>
-            <a href={`${base}/areas/${hovered.slug}`}>Open {hovered.name} →</a>
+            {hovered.slug && <a href={`${base}/areas/${hovered.slug}`}>Open {hovered.name} →</a>}
           </div>
         )}
-
-        {!feats && !err && <p className="ch-loading muted">Loading {`${2471}`} localities…</p>}
       </div>
     </div>
   );

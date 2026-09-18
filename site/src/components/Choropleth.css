@@ -47,23 +47,26 @@
   overflow: hidden;
 }
 
-.ch-canvas {
-  display: block;
+.ch-map {
   width: 100%;
-  touch-action: none;
-  cursor: grab;
+  /* Tall enough to be worth panning, short enough to leave the controls and
+     the legend on screen on a laptop. */
+  height: clamp(420px, 72vh, 760px);
 }
-.ch-canvas:active { cursor: grabbing; }
+.ch-map canvas:focus-visible { outline: 2px solid var(--s-focus); outline-offset: -2px; }
 
-/* The hit-test surface is never shown; it only has to exist at the same size.
- * `display:none` would stop it being painted, so it is moved out of view
- * instead — and it is aria-hidden so it is not announced. */
-.ch-pick {
-  position: absolute;
-  left: -99999px;
-  top: 0;
-  pointer-events: none;
+/* MapLibre's own chrome, toned to the page rather than its defaults. */
+.ch-stage .maplibregl-ctrl-group {
+  background: var(--s-panel);
+  border: 1px solid var(--s-rule);
+  box-shadow: none;
 }
+.ch-stage .maplibregl-ctrl-group button + button { border-top: 1px solid var(--s-rule); }
+.ch-stage .maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--s-panel) 85%, transparent);
+  font-size: 0.72rem;
+}
+.ch-stage .maplibregl-ctrl-attrib a { color: var(--s-ink-soft); }
 
 .ch-loading {
   position: absolute;
@@ -71,7 +74,10 @@
   display: grid;
   place-items: center;
   margin: 0;
+  pointer-events: none;
+  z-index: 4;
 }
+.ch-loading a { pointer-events: auto; }
 
 /* The readout goes to the pointer. */
 .ch-readout {
@@ -109,3 +115,9 @@
 }
 .ch-readout dt { color: var(--s-ink-soft); }
 .ch-readout dd { margin: 0; font-weight: 600; }
+
+.ch-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
