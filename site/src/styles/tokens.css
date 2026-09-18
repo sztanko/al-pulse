@@ -1,0 +1,161 @@
+/* Design tokens.
+ *
+ * Two colour systems, kept apart:
+ *   --s-*  surfaces and chrome — adapt to theme
+ *   --m-*  data marks — chosen per surface so they stay discriminable
+ *
+ * Every token is defined on bare :root. The dark values are then repeated in
+ * two places (the media query, for "follow the system", and the [data-theme]
+ * attribute, for an explicit choice) because plain CSS cannot share one block
+ * between them. scripts/check-theme-parity.mjs asserts the two copies carry
+ * the same token names — a token added to one and not the other produces a
+ * site that is correct until someone touches the toggle.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* chrome */
+  --s-bg: #fbfaf8;
+  --s-panel: #ffffff;
+  --s-panel-2: #f4f2ee;
+  --s-rule: #e2ded6;
+  --s-rule-strong: #c9c3b7;
+  --s-ink: #1b1a17;
+  --s-ink-soft: #57534a;
+  --s-ink-faint: #8a8377;
+  --s-focus: #1f6feb;
+  --s-shadow: rgba(27, 26, 23, 0.12);
+
+  /* marks — drawn at full opacity, never a text token at 3px */
+  --m-primary: #1d6a8c;
+  --m-primary-soft: #7fb4c9;
+  --m-secondary: #c2621d;
+  --m-accent: #6b4d9e;
+  --m-positive: #2f7d4f;
+  --m-negative: #a8332a;
+  --m-neutral: #8a8377;
+  --m-grid: #e6e2da;
+
+  /* categorical set — distinguishable under deuteranopia/protanopia */
+  --m-cat-1: #1d6a8c;
+  --m-cat-2: #c2621d;
+  --m-cat-3: #6b4d9e;
+  --m-cat-4: #2f7d4f;
+  --m-cat-5: #a8332a;
+  --m-cat-6: #7a6a3f;
+  --m-cat-7: #4a7fb5;
+  --m-cat-8: #97577f;
+
+  /* sequential ramp, light → dark, for rank/density choropleths */
+  --m-seq-1: #fff7ec;
+  --m-seq-2: #fee8c8;
+  --m-seq-3: #fdd49e;
+  --m-seq-4: #fdbb84;
+  --m-seq-5: #fc8d59;
+  --m-seq-6: #ef6548;
+  --m-seq-7: #d7301f;
+  --m-seq-8: #b30000;
+  --m-seq-9: #7f0000;
+
+  /* type + metrics */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --measure: 68ch;
+  --gap: 1rem;
+  --radius: 6px;
+  --header-h: 3.25rem;
+}
+
+/* Dark, when the reader has expressed no preference. Guarded so an explicit
+ * light choice wins over the system setting. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --s-bg: #14161a;
+    --s-panel: #1b1e24;
+    --s-panel-2: #22262e;
+    --s-rule: #2f343d;
+    --s-rule-strong: #454c58;
+    --s-ink: #eceef2;
+    --s-ink-soft: #b0b6c0;
+    --s-ink-faint: #7d8492;
+    --s-focus: #6aa8ff;
+    --s-shadow: rgba(0, 0, 0, 0.5);
+
+    --m-primary: #5fb6d9;
+    --m-primary-soft: #33708b;
+    --m-secondary: #f0914a;
+    --m-accent: #a98bdb;
+    --m-positive: #5cc98a;
+    --m-negative: #f0736a;
+    --m-neutral: #8b93a1;
+    --m-grid: #2b3038;
+
+    --m-cat-1: #5fb6d9;
+    --m-cat-2: #f0914a;
+    --m-cat-3: #a98bdb;
+    --m-cat-4: #5cc98a;
+    --m-cat-5: #f0736a;
+    --m-cat-6: #cbb26a;
+    --m-cat-7: #7fb2ea;
+    --m-cat-8: #dc8fbc;
+
+    --m-seq-1: #2a1a14;
+    --m-seq-2: #46261a;
+    --m-seq-3: #63331f;
+    --m-seq-4: #8a4526;
+    --m-seq-5: #b25a2c;
+    --m-seq-6: #d4703a;
+    --m-seq-7: #e88b57;
+    --m-seq-8: #f3a97c;
+    --m-seq-9: #ffc9a4;
+  }
+}
+
+/* Dark, chosen explicitly. Same tokens as the block above. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --s-bg: #14161a;
+  --s-panel: #1b1e24;
+  --s-panel-2: #22262e;
+  --s-rule: #2f343d;
+  --s-rule-strong: #454c58;
+  --s-ink: #eceef2;
+  --s-ink-soft: #b0b6c0;
+  --s-ink-faint: #7d8492;
+  --s-focus: #6aa8ff;
+  --s-shadow: rgba(0, 0, 0, 0.5);
+
+  --m-primary: #5fb6d9;
+  --m-primary-soft: #33708b;
+  --m-secondary: #f0914a;
+  --m-accent: #a98bdb;
+  --m-positive: #5cc98a;
+  --m-negative: #f0736a;
+  --m-neutral: #8b93a1;
+  --m-grid: #2b3038;
+
+  --m-cat-1: #5fb6d9;
+  --m-cat-2: #f0914a;
+  --m-cat-3: #a98bdb;
+  --m-cat-4: #5cc98a;
+  --m-cat-5: #f0736a;
+  --m-cat-6: #cbb26a;
+  --m-cat-7: #7fb2ea;
+  --m-cat-8: #dc8fbc;
+
+  --m-seq-1: #2a1a14;
+  --m-seq-2: #46261a;
+  --m-seq-3: #63331f;
+  --m-seq-4: #8a4526;
+  --m-seq-5: #b25a2c;
+  --m-seq-6: #d4703a;
+  --m-seq-7: #e88b57;
+  --m-seq-8: #f3a97c;
+  --m-seq-9: #ffc9a4;
+}

@@ -12,7 +12,7 @@ This is a geospatial data analysis project focused on Portuguese AL (Alojamento 
 - **Raw Data Sources**: AL listings, OSM admin boundaries, postal codes, census data
 - **Storage**: DuckDB database (`data/prod.duckdb`) with spatial extension
 - **Processing**: DBT models organized in staging → intermediate → marts layers  
-- **Visualization**: Evidence.dev reports with custom theming and geospatial components.  
+- **Visualization**: a bespoke static site in `site/` (Astro + React islands, hand-rolled SVG/canvas)
 - **ETL**: Python scripts for data fetching and processing
 
 ### DBT Model Structure
@@ -47,26 +47,35 @@ dbt run                   # Run all models
 dbt test                  # Run data quality tests
 ```
 
-### Evidence.dev Reports
+### The site
 ```bash
-cd reports
-npm install               # Install dependencies
-npm run sources          # Generate data sources
-npm run dev              # Development server
-npm run build            # Production build
+./scripts/run_report.sh   # geometry + payloads + gated build  → site/dist
+cd site
+npm run dev               # development server
+npm run verify            # browser checks against the built output
 ```
 
-In order to expose a table from dbt duckdb to reports, you need to add a simple sql file (select * from <original table>) in `reports/sources/` and then run `npm run sources` to generate the data source.
-You can then refer to those sources in md files in `reports/pages/`.
+`npm run build` runs two gates before Astro: `check:theme` (the dark palette is
+declared twice and the copies must match) and `astro check`.
 
-You can read more about the Evidence.dev sources in the [Evidence.dev documentation](Their documentaion is here: https://docs.evidence.dev/components/all-components/).
+The site is built from JSON payloads, not from a live query layer. To expose a
+new mart to it, add a query to `scripts/export_site_data.py` and a typed
+accessor in `site/src/lib/data.ts`. Payloads land in `site/data/` (build-time
+only, never served); a page reads them during `astro build` and passes an
+island only the rows it draws.
 
-You can also check evidence_doc.md for more information on how to use Evidence.dev
+Design rules for anything added here are in
+`/home/dimi/workspace/docs/dataviz-principles.md`, and the Evidence → bespoke
+feature contract is `site/FEATURE_PARITY.md`.
 
-There are 3 pages right now:
-- `index.md`: Main page with overview of country-wide statistics
-- `[id].md`: Individual region, municipality and locality pages with detailed statistics
-- `map.md`: Map visualization of AL listings across Portugal
+
+
+Pages:
+- `index.astro` — national overview
+- `areas/[slug].astro` — one page per area (2,779 of them)
+- `areas/index.astro` — searchable index of every area
+- `map.astro` — canvas choropleth of all localities
+- `method.astro` — how the figures are made and what they cannot tell you
 
 ### DuckDB Operations
 ```bash
@@ -81,7 +90,7 @@ duckdb data/prod.duckdb
 
 - `dbt_project.yml`: DBT configuration with materialization strategies and variables for metrics
 - `config/profiles.yml`: DuckDB connection with spatial extension
-- `reports/evidence.config.yaml`: Evidence.dev theming and deployment settings (basePath: /al-pulse)
+- `site/astro.config.mjs`: base path `/al-pulse` for GitHub Pages
 - `scripts/constants.sh`: Environment variables for data paths
 
 ## Data Model
@@ -126,8 +135,8 @@ Key packages in `requirements.txt`:
 1. Modify DBT models in appropriate layer (staging/intermediate/marts)
 2. Run `dbt run --select <model_name>` to test individual models
 3. Use `dbt test` to validate data quality
-4. Update Evidence.dev reports in `reports/pages/`
-5. Build reports with `npm run build` in reports directory
+4. Update the site in `site/src/pages/`
+5. Build with `./scripts/run_report.sh`, then `npm run verify` in `site/`
 
 ## Important Notes
 

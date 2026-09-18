@@ -1,1 +1,0 @@
-select * from room_distribution_comparison

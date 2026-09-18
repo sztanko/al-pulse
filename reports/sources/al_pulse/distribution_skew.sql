@@ -1,1 +1,0 @@
-select * from distribution_skew

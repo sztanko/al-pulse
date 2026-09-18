@@ -1,0 +1,36 @@
+{
+  "name": "al-pulse-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "npm run check:theme && npm run check:types && astro build",
+    "build:only": "astro build",
+    "preview": "astro preview",
+    "check:types": "astro check",
+    "check:theme": "node scripts/check-theme-parity.mjs",
+    "verify": "node scripts/verify-built-site.mjs"
+  },
+  "dependencies": {
+    "@astrojs/react": "^4.4.2",
+    "astro": "^5.18.2",
+    "d3-array": "^3.2.4",
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@types/d3-array": "^3.2.1",
+    "@types/d3-scale": "^4.0.8",
+    "@types/d3-shape": "^3.1.6",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "playwright": "^1.63.0",
+    "typescript": "^5.7.2",
+    "mapshaper": "^0.6.109"
+  }
+}

@@ -1,0 +1,232 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* An opaque sticky header sits above the page in the stacking order, so
+   * anything scrolled to the top lands underneath it — invisible and
+   * untouchable. Focusing a control scrolls it into view, so without this the
+   * act of tapping a control can be what hides it. */
+  scroll-padding-top: calc(var(--header-h) + 0.75rem);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--s-bg);
+  color: var(--s-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  /* The page must never scroll sideways; wide marks scroll inside their own
+   * container instead. */
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--m-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible {
+  outline: 2px solid var(--s-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+h1, h2, h3, h4 {
+  line-height: 1.2;
+  margin: 0 0 0.35em;
+  font-weight: 620;
+  letter-spacing: -0.011em;
+}
+h1 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.3rem); }
+h2 { font-size: clamp(1.15rem, 1rem + 0.7vw, 1.45rem); margin-top: 2.2rem; }
+h3 { font-size: 1.02rem; margin-top: 1.5rem; color: var(--s-ink-soft); }
+
+p { margin: 0 0 0.9em; max-width: var(--measure); }
+
+.shell {
+  width: min(1180px, 100% - 2rem);
+  margin-inline: auto;
+  padding-bottom: 5rem;
+}
+
+/* ---------------------------------------------------------------- header */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-inline: max(1rem, calc(50% - 590px));
+  background: color-mix(in srgb, var(--s-bg) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--s-rule);
+}
+.site-header nav { display: flex; gap: 0.9rem; align-items: center; }
+.site-header a {
+  color: var(--s-ink-soft);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.site-header a[aria-current='page'] { color: var(--s-ink); font-weight: 600; }
+.brand {
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  color: var(--s-ink) !important;
+  margin-right: auto;
+}
+
+/* The control is useless until its script has run, so it starts hidden. */
+.theme-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.15rem;
+  border: 1px solid var(--s-rule);
+  border-radius: var(--radius);
+  padding: 2px;
+  background: var(--s-panel);
+}
+.theme-toggle[data-ready='1'] { display: inline-flex; }
+.theme-toggle button {
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  /* Real touch target: padding grows the hit box without moving the label. */
+  padding: 0.5rem 0.55rem;
+  min-height: 34px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--s-ink-faint);
+  cursor: pointer;
+}
+.theme-toggle button[aria-pressed='true'] {
+  background: var(--s-panel-2);
+  color: var(--s-ink);
+}
+
+/* ----------------------------------------------------------------- blocks */
+.lede { color: var(--s-ink-soft); max-width: var(--measure); }
+.muted { color: var(--s-ink-soft); }
+.faint { color: var(--s-ink-faint); }
+.small { font-size: 0.84rem; }
+.num { font-variant-numeric: tabular-nums; }
+
+.panel {
+  background: var(--s-panel);
+  border: 1px solid var(--s-rule);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem 1.2rem;
+}
+
+.grid {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.chart-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* A wide chart scrolls inside here rather than widening the document. */
+}
+
+figure { margin: 0 0 1.4rem; }
+figcaption {
+  color: var(--s-ink-soft);
+  font-size: 0.86rem;
+  margin-top: 0.4rem;
+  max-width: var(--measure);
+}
+
+.chart-title {
+  font-weight: 620;
+  font-size: 0.98rem;
+  margin-bottom: 0.15rem;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.9rem;
+  font-size: 0.82rem;
+  color: var(--s-ink-soft);
+  margin: 0.3rem 0 0.5rem;
+}
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend i {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--s-panel);
+  color: var(--s-ink);
+  padding: 0.6rem 0.9rem;
+  z-index: 60;
+  border: 1px solid var(--s-rule);
+}
+.skip-link:focus { left: 0.5rem; top: 0.5rem; }
+
+.breadcrumb {
+  font-size: 0.85rem;
+  color: var(--s-ink-faint);
+  margin: 1.1rem 0 0.2rem;
+}
+.breadcrumb a { color: var(--s-ink-soft); }
+
+.footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--s-rule);
+  color: var(--s-ink-faint);
+  font-size: 0.82rem;
+}
+
+/* Below this the header cannot fit the brand, four links and a three-way theme
+ * control on one row — it overflowed to 512px inside a 360px viewport, which
+ * scrolls the whole page sideways. Two rows instead of hiding anything; the
+ * header height token moves with it so `scroll-padding-top` keeps anchors and
+ * focused controls clear of the sticky bar. */
+@media (max-width: 620px) {
+  :root { --header-h: 5.6rem; }
+
+  .site-header {
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 0.1rem;
+    padding-block: 0.3rem;
+    padding-inline: 0.6rem;
+  }
+  .brand { flex: 1 1 auto; }
+  .theme-toggle { order: 2; }
+  .site-header nav {
+    order: 3;
+    flex: 1 0 100%;
+    /* If the links still cannot fit, they scroll within the bar rather than
+     * widening the document. */
+    overflow-x: auto;
+    gap: 0.75rem;
+    padding-bottom: 0.15rem;
+  }
+  .theme-toggle button { padding-inline: 0.45rem; }
+}
+
+@media (max-width: 540px) {
+  body { font-size: 14px; }
+  .shell { width: min(1180px, 100% - 1.2rem); }
+}

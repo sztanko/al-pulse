@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro';
+import Choropleth from '../components/Choropleth.tsx';
+import { meta } from '../lib/data';
+import { monthLabel } from '../lib/format';
+
+const m = meta();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Base
+  title="Every locality, mapped — AL Pulse"
+  active="map"
+  description="Choropleth of all 2,471 Portuguese localities by registered short-lets."
+>
+  <h1>Where the short-lets are</h1>
+  <p class="lede">
+    All {m.counts.localities.toLocaleString('en-GB')} localities with a registered
+    Alojamento Local, as of {monthLabel(m.data_through)}. Drag to pan, scroll or
+    use the buttons to zoom, and hover or tap any locality to open it.
+  </p>
+
+  <Choropleth client:load geoUrl={`${base}/geo/localities.json`} base={base} />
+
+  <p class="small faint" style="margin-top:0.8rem">
+    Colour bins are quantiles, so each shade holds the same number of
+    localities — that keeps the ramp readable when a handful of places dwarf
+    everywhere else. Localities with no value are drawn flat.
+  </p>
+</Base>

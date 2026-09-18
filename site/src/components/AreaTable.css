@@ -1,0 +1,135 @@
+.at { width: 100%; min-width: 0; }
+
+.at-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.at-search { flex: 1 1 14rem; min-width: 0; }
+.at-search-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--s-ink-soft);
+  margin-bottom: 0.2rem;
+}
+.at-search input {
+  font: inherit;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  min-height: 40px;
+  border: 1px solid var(--s-rule);
+  border-radius: var(--radius);
+  background: var(--s-panel);
+  color: var(--s-ink);
+}
+
+/* Wide tables scroll inside their own container; the page never does. */
+.at-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--s-rule);
+  border-radius: var(--radius);
+  background: var(--s-panel);
+}
+
+.at-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.at-caption {
+  text-align: left;
+  padding: 0.6rem 0.7rem 0.4rem;
+  font-weight: 620;
+  color: var(--s-ink);
+}
+.at-table th,
+.at-table td {
+  padding: 0.3rem 0.7rem;
+  border-top: 1px solid var(--s-rule);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.at-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--s-panel-2);
+  z-index: 1;
+  padding: 0;
+}
+.at-table thead th button {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--s-ink-soft);
+  background: none;
+  border: 0;
+  width: 100%;
+  text-align: inherit;
+  padding: 0.55rem 0.7rem;
+  min-height: 38px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.at-table thead th.col-num button { justify-content: flex-end; }
+.at-table thead th button i {
+  font-style: normal;
+  font-size: 0.7em;
+  color: var(--s-ink-faint);
+}
+.col-text { text-align: left; }
+.col-num { text-align: right; }
+
+/* Bar first, number second — the bar is the mark, the number is a label on it. */
+.cell-bar {
+  position: relative;
+  display: inline-grid;
+  align-items: center;
+  width: 8.5rem;
+  max-width: 100%;
+  height: 1.45rem;
+}
+.cell-bar i {
+  position: absolute;
+  inset-block: 3px;
+  left: 0;
+  background: var(--m-primary-soft);
+  border-radius: 2px;
+  display: block;
+  min-width: 1px;
+}
+.cell-bar.is-alt i { background: var(--m-accent); opacity: 0.45; }
+.cell-bar.is-rank i { background: var(--m-neutral); opacity: 0.4; }
+.cell-bar b {
+  position: relative;
+  text-align: right;
+  padding-right: 0.35rem;
+  font-weight: 560;
+}
+
+.dir-up { color: var(--m-positive); }
+.dir-down { color: var(--m-negative); }
+.dir-flat { color: var(--s-ink-faint); }
+
+.at-table tbody tr:hover { background: var(--s-panel-2); }
+
+.at-more {
+  font: inherit;
+  font-size: 0.85rem;
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  min-height: 40px;
+  border: 1px solid var(--s-rule);
+  border-radius: var(--radius);
+  background: var(--s-panel);
+  color: var(--s-ink-soft);
+  cursor: pointer;
+}
+.at-more:hover { background: var(--s-panel-2); color: var(--s-ink); }
+
+@media (max-width: 560px) {
+  .cell-bar { width: 6rem; }
+}
