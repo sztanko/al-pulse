@@ -152,6 +152,11 @@ p { margin: 0 0 0.9em; max-width: var(--measure); }
   grid-template-columns: 1fr;
   gap: 0.6rem;
 }
+.rank-na {
+  margin: -0.2rem 0 0.55rem;
+  line-height: 1.4;
+}
+
 .metric-group-title {
   font-size: 0.78rem;
   font-weight: 600;

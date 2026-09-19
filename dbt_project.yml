@@ -45,6 +45,12 @@ seeds:
       description: text
 
 vars:
+  # The Azores are excluded from every time series because their register is a
+  # separate, regional one with no registration dates. The id appears in
+  # al.sql, int_lost_licenses_mapped.sql and the azores_* models; naming it
+  # once keeps those four in agreement.
+  azores_region_osm_id: 1629146
+
   metrics:
     c: normal
     al_per_1000: normal

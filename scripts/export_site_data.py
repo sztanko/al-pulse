@@ -121,12 +121,14 @@ def fetch_area_rows(con: duckdb.DuckDBPyConnection) -> list[dict]:
             s.rank_within_country_change AS rank_within_country_change,
             s.direct_parent_slug        AS direct_parent_slug,
             s.ancestor_municipality_slug AS ancestor_municipality_slug,
-            s.ancestor_region_slug      AS ancestor_region_slug
+            s.ancestor_region_slug      AS ancestor_region_slug,
+            s.has_time_series           AS in_time_series
         FROM admin a
-        -- INNER, not LEFT: `admin` carries 650 Azorean areas that the marts
-        -- deliberately exclude ("their AL data is not really updated"), and a
-        -- page for one would be a page of blanks. This yields exactly the 2,779
-        -- areas the Evidence site linked to.
+        -- INNER, not LEFT: `admin` carries every Portuguese area, including
+        -- ones neither register lists, and a page for one would be a page of
+        -- blanks. Since the Azorean regional register was added this yields
+        -- 2,950 areas: 2,779 with a monthly history plus 171 Azorean ones
+        -- known only as a current snapshot, flagged by `in_time_series`.
         JOIN area_summary s ON s.area_slug = a.slug
         WHERE a.admin_type IN ('region', 'municipality', 'locality')
         ORDER BY a.admin_type, a.name
@@ -261,17 +263,47 @@ def fetch_country_rooms(con: duckdb.DuckDBPyConnection) -> list[dict]:
         """)
 
 
+def fetch_azores_counts(con: duckdb.DuckDBPyConnection) -> tuple[int, int]:
+    """How many establishments each register holds for the Azores.
+
+    The second number is the point of the footnote. The national register does
+    carry Azorean rows — it is not stale, and saying so would be wrong — it
+    just carries a small fraction of them, because tourism is a regional
+    competence and Azorean operators register regionally. Both numbers are
+    read from the data so the explanation cannot drift from it.
+    """
+    regional = rows_as_dicts(con, """
+        SELECT al_count FROM azores_area_stats WHERE admin_type = 'region'
+        """)
+    national = rows_as_dicts(con, """
+        SELECT count(*) AS n
+        FROM al_unmapped
+        WHERE is_active AND lower(strip_accents(district)) = 'acores'
+        """)
+    return (
+        int(regional[0]["al_count"]) if regional else 0,
+        int(national[0]["n"]) if national else 0,
+    )
+
+
 def fetch_map_features(con: duckdb.DuckDBPyConnection) -> list[dict]:
     """Per-locality values the choropleth colours and labels."""
     return rows_as_dicts(con, """
         SELECT admin_id, id, name, full_name, slug, population,
-               al_count, rank_within_country, people_per_al, people_per_al_rank
+               al_count, rank_within_country, people_per_al, people_per_al_rank,
+               has_time_series
         FROM localities_with_data_for_geojson
         """)
 
 
 # ------------------------------------------------------------------ assembly
-def build_meta(axis: list[str], areas: list[dict], observed: list[str]) -> dict:
+def build_meta(
+    axis: list[str],
+    areas: list[dict],
+    observed: list[str],
+    azores_total: int,
+    azores_in_rnal: int,
+) -> dict:
     # Losses become detectable one month after the first snapshot, and stay
     # detectable only where consecutive snapshots bracket the month.
     obs = set(observed)
@@ -297,6 +329,21 @@ def build_meta(axis: list[str], areas: list[dict], observed: list[str]) -> dict:
             "regions": sum(1 for a in areas if a["admin_type"] == "region"),
             "municipalities": sum(1 for a in areas if a["admin_type"] == "municipality"),
             "localities": sum(1 for a in areas if a["admin_type"] == "locality"),
+        },
+        # Everything the site needs to write the asterisk without hardcoding a
+        # number that would go stale the month the register changes.
+        "azores": {
+            "listings": azores_total,
+            "areas": sum(1 for a in areas if not a.get("in_time_series", True)),
+            "municipalities": sum(
+                1 for a in areas
+                if not a.get("in_time_series", True) and a["admin_type"] == "municipality"
+            ),
+            "localities": sum(
+                1 for a in areas
+                if not a.get("in_time_series", True) and a["admin_type"] == "locality"
+            ),
+            "in_national_register": azores_in_rnal,
         },
     }
 
@@ -350,6 +397,12 @@ def build_shard(
             else None
         ),
         "parent_path": area.get("parent_path"),
+        # False for the Azores: their register has no registration dates, so
+        # `series`, `hierarchy` and `subareas` are all empty here and the page
+        # draws an explanation where the charts would go. Carried explicitly
+        # rather than left for the site to infer from an empty array, which
+        # would make a genuine data failure look like a documented absence.
+        "in_time_series": bool(area.get("in_time_series", True)),
         "series": own,
         "hierarchy": hierarchy,
         "subareas": subareas,
@@ -397,6 +450,7 @@ def main(
     rooms = fetch_rooms(con)
     map_rows = fetch_map_features(con)
     observed = fetch_observed_months(con)
+    azores_total, azores_in_rnal = fetch_azores_counts(con)
 
     by_id = {int(a["id"]): a for a in areas}
     children: dict[int, list[dict]] = {}
@@ -412,7 +466,10 @@ def main(
     out.mkdir(parents=True, exist_ok=True)
 
     total = 0
-    total += write_json(out / "meta.json", build_meta(axis, areas, observed))
+    total += write_json(
+        out / "meta.json",
+        build_meta(axis, areas, observed, azores_total, azores_in_rnal),
+    )
     total += write_json(
         out / "country.json",
         {
@@ -430,7 +487,17 @@ def main(
         ],
     )
     total += write_json(out / "events.json", events)
-    total += write_json(out / "map.json", [{k: _clean(v) for k, v in r.items()} for r in map_rows])
+    # A metric with no value is *omitted*, not written as null. MapLibre has no
+    # null test in its expression language, so a feature carrying
+    # `"rank_within_country": null` has to be distinguished some other way —
+    # and `["to-number", ["get", m], -1]` would coerce it to -1, which for an
+    # inverted ramp is the *strongest* colour. Unranked Azorean localities
+    # would have been painted as if they were rank 1. Omitting the key lets the
+    # fill expression ask `["has", m]` and paint a no-data shade instead.
+    total += write_json(
+        out / "map.json",
+        [{k: _clean(v) for k, v in r.items() if _clean(v) is not None} for r in map_rows],
+    )
 
     shard_bytes = 0
     for a in areas:

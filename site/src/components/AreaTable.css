@@ -133,3 +133,13 @@
 @media (max-width: 560px) {
   .cell-bar { width: 6rem; }
 }
+
+/* Rows whose figures cannot exist, rather than being unknown or zero. Muted
+   enough to read as a different kind of row, not so muted that the AL count —
+   which is real and current — looks unreliable. */
+.dir-na { color: var(--s-ink-faint); font-style: italic; }
+.at-table tr.is-untimed .col-text a { text-decoration-style: dotted; }
+.at-note {
+  margin: 0.5rem 0 0;
+  line-height: 1.4;
+}

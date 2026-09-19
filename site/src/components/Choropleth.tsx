@@ -29,6 +29,8 @@ interface Hovered {
   slug: string;
   name: string;
   full: string;
+  /** False for the Azores, whose register has no dates and therefore no rank. */
+  ranked: boolean;
   al: number | null;
   rank: number | null;
   ppa: number | null;
@@ -44,6 +46,9 @@ interface Hovered {
 const METRICS: {
   key: Metric; label: string; hint: string; invert: boolean;
   lo: string; hi: string; scale: 'quantile' | 'log';
+  /** Shown beside the ramp when some localities have no value for this metric,
+   * so the no-data shade is named rather than left to be guessed. */
+  missing?: string;
 }[] = [
   {
     // Rank is uniform by construction — 1..2471 with one locality at each — so
@@ -55,6 +60,7 @@ const METRICS: {
     scale: 'log',
     hint: 'stronger colour = higher up the national ranking',
     lo: 'lowest ranked', hi: 'rank 1',
+    missing: 'not ranked (Azores)',
   },
   {
     key: 'al_count', label: 'Number of ALs', invert: false, scale: 'quantile',
@@ -65,6 +71,7 @@ const METRICS: {
     key: 'people_per_al', label: 'Residents per AL', invert: true, scale: 'quantile',
     hint: 'stronger colour = denser (fewer residents per registration)',
     lo: 'least dense', hi: 'densest',
+    missing: 'no population figure',
   },
 ];
 
@@ -73,6 +80,9 @@ const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
 
 const MAINLAND: [number, number, number, number] = [-9.6, 36.9, -6.1, 42.2];
 const MADEIRA: [number, number, number, number] = [-17.3, 32.6, -16.2, 33.15];
+// The archipelago spans 600 km of ocean, 1,500 km from Lisbon. Nobody finds it
+// by panning, so it gets a button like the other two.
+const AZORES: [number, number, number, number] = [-31.4, 36.8, -24.9, 39.8];
 
 const SRC = 'localities';
 const FILL = 'localities-fill';
@@ -87,6 +97,18 @@ const isDark = () => {
   if (attr === 'light') return false;
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 };
+
+/** Sentinel for "this feature has no value for this metric".
+ *
+ * MapLibre's expression language has no null test, and the GeoJSON carries
+ * explicit `null`s (GDAL writes them; an unranked Azorean locality is one).
+ * `["to-number", ["get", m], -1]` would turn that into -1, which on an
+ * inverted ramp is the *strongest* shade — every unranked locality painted as
+ * if it were rank 1. `coalesce` is the documented way to catch both an absent
+ * key and a null one, and the sentinel is a value no metric here can take. */
+const NO_VALUE = -999999;
+
+const noDataColor = (dark: boolean) => (dark ? '#2b2f36' : '#e6e6e9');
 
 const rampVars = (steps: number): string[] => {
   const cs = getComputedStyle(document.documentElement);
@@ -106,7 +128,10 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
   const addLayersRef = useRef<((m: MLMap, d: GeoJSON.FeatureCollection) => void) | null>(null);
   const computeBreaksRef = useRef<((f: GeoJSON.Feature[]) => Record<Metric, number[]>) | null>(null);
 
-  const [metric, setMetric] = useState<Metric>('rank_within_country');
+  // Count, not rank, is the default. Rank exists only for areas on the national
+  // register, so a map that opens on rank opens with 151 Azorean localities
+  // greyed out — the first thing a reader sees would be a hole.
+  const [metric, setMetric] = useState<Metric>('al_count');
   const [hovered, setHovered] = useState<Hovered | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -160,10 +185,12 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
       const cuts = breaksRef.current[m] ?? [];
       const inv = METRICS.find((x) => x.key === m)?.invert ?? false;
       const shade = (i: number) => ramp[inv ? ramp.length - 1 - i : i] ?? ramp[0] ?? '#ccc';
-      if (!cuts.length) return shade(0);
-      const expr: unknown[] = ['step', ['to-number', ['get', m], -1], shade(0)];
+      const value = ['coalesce', ['get', m], NO_VALUE];
+      const missing = ['==', value, NO_VALUE];
+      if (!cuts.length) return ['case', missing, noDataColor(isDark()), shade(0)];
+      const expr: unknown[] = ['step', ['to-number', value, NO_VALUE], shade(0)];
       cuts.forEach((c, i) => expr.push(c, shade(Math.min(i + 1, ramp.length - 1))));
-      return expr;
+      return ['case', missing, noDataColor(isDark()), expr];
     },
     [steps]
   );
@@ -309,6 +336,7 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
         slug: String(p.slug ?? ''),
         name: String(p.name ?? ''),
         full: String(p.full_name ?? ''),
+        ranked: p.has_time_series !== false,
         al: typeof p.al_count === 'number' ? p.al_count : Number(p.al_count) || null,
         rank:
           typeof p.rank_within_country === 'number'
@@ -419,6 +447,7 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
         <div className="ch-zoom" role="group" aria-label="Jump to">
           <button type="button" onClick={() => flyTo(MAINLAND)}>Mainland</button>
           <button type="button" onClick={() => flyTo(MADEIRA)}>Madeira</button>
+          <button type="button" onClick={() => flyTo(AZORES)}>Azores</button>
         </div>
       </div>
 
@@ -433,6 +462,11 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
           </span>
           <span className="small faint">{active.hi}</span>
         </span>
+        {active.missing && (
+          <span className="ch-nodata small faint">
+            <i aria-hidden="true" /> {active.missing}
+          </span>
+        )}
       </div>
 
       <div className="ch-stage">
@@ -465,7 +499,12 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
             <div className="ch-readout-sub small faint">{hovered.full}</div>
             <dl>
               <div><dt>Registered ALs</dt><dd className="num">{n0(hovered.al)}</dd></div>
-              <div><dt>Rank in Portugal</dt><dd className="num">{n0(hovered.rank)}</dd></div>
+              <div>
+                <dt>Rank in Portugal</dt>
+                <dd className={hovered.ranked ? 'num' : 'num faint'}>
+                  {hovered.ranked ? n0(hovered.rank) : 'not ranked'}
+                </dd>
+              </div>
               <div><dt>Residents per AL</dt><dd className="num">{n0(hovered.ppa)}</dd></div>
               <div><dt>Population</dt><dd className="num">{n0(hovered.pop)}</dd></div>
             </dl>

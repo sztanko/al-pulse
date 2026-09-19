@@ -32,6 +32,8 @@ const ROUTES = [
   ['/areas/faro', 'region'],
   ['/areas/albufeira_faro', 'municipality'],
   ['/areas/carregueira_chamusca_santarem', 'locality'],
+  ['/areas/ponta_delgada_acores', 'azores municipality'],
+  ['/areas/achada_nordeste_acores', 'azores locality'],
 ];
 const THEMES = ['light', 'dark'];
 const VIEWPORTS = [
@@ -326,6 +328,54 @@ async function checkRoomMix(browser) {
   await ctx.close();
 }
 
+/** An area with no time series must show no chart at all, and must say why.
+ *
+ * The failure this guards against is silent and plausible-looking: an empty
+ * series rendered as a flat line at zero, which claims the register has been
+ * empty there since 2012. A blank chart and a missing chart are impossible to
+ * tell apart in a screenshot, so this asserts on the DOM.
+ */
+async function checkUntimedArea(browser) {
+  const where = 'azores area page [wide]';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/ponta_delgada_acores`, {
+    waitUntil: 'networkidle',
+    timeout: 45000,
+  });
+  await scrollThrough(page);
+
+  for (const sel of ['.ts-svg', '.ge-svg', '.sm-svg']) {
+    const n = await page.locator(sel).count();
+    if (n > 0) fail(where, `${n} ${sel} chart(s) drawn for an area with no time series`);
+  }
+  if (!(await page.locator('.fn-note').count())) {
+    fail(where, 'no explanation of why there is no chart');
+  }
+  const body = await page.evaluate(() => document.body.innerText);
+  if (!/separate register/i.test(body)) {
+    fail(where, 'the page never says the Azores keep a separate register');
+  }
+  // The count itself must still be there and must be a real number.
+  const headline = await page.locator('.metric-value').first().innerText();
+  if (!/^[0-9][0-9,]*$/.test(headline.trim())) {
+    fail(where, `headline count is "${headline.trim()}", not a number`);
+  }
+
+  // And the national pages must still draw their charts — a guard against
+  // "fixing" this by turning the charts off everywhere.
+  await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/faro`, {
+    waitUntil: 'networkidle',
+    timeout: 45000,
+  });
+  await scrollThrough(page);
+  if ((await page.locator('.ts-svg').count()) === 0) {
+    fail(where, 'a national area page lost its time-series chart');
+  }
+
+  await ctx.close();
+}
+
 const { srv, root } = serve();
 await new Promise((r) => setTimeout(r, 1200));
 
@@ -342,6 +392,7 @@ try {
   await checkSlider(browser);
   await checkTabs(browser);
   await checkRoomMix(browser);
+  await checkUntimedArea(browser);
 } catch (e) {
   fail('harness', String(e).slice(0, 300));
 } finally {
@@ -356,5 +407,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `verify ok — ${ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs and the room mix`
+  `verify ok — ${ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix and the untimed areas`
 );
