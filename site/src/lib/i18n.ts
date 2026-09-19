@@ -126,8 +126,6 @@ const DICT = {
   // ------------------------------------------------------------------ charts
   'chart.total': entry({ en: 'Total registered', pt: 'Total registado' }),
   'chart.new_month': entry({ en: 'New that month', pt: 'Novos nesse mês' }),
-  'chart.lost_cum': entry({ en: 'Lost, cumulative', pt: 'Perdidos, acumulado' }),
-  'chart.lost_month': entry({ en: 'Lost that month', pt: 'Perdidos nesse mês' }),
   'chart.read_hint': entry({
     en: 'Hover, tap or focus the chart and use the arrow keys to read any month.',
     pt: 'Passe o rato, toque ou foque o gráfico e use as setas para ler qualquer mês.',
@@ -363,23 +361,7 @@ const DICT = {
     pt: 'Proporção da população portuguesa nessas mesmas freguesias',
   }),
 
-  'home.h_registrations': entry({
-    en: 'Registrations, and what stopped them',
-    pt: 'Registos, e o que os travou',
-  }),
-  'home.p_registrations': entry({
-    en: 'The line is the running total; the bars are registrations added each month. Numbered dashed rules mark the changes to the law, listed under the chart. Mainland Portugal and Madeira only',
-    pt: 'A linha é o total acumulado; as barras são os registos acrescentados em cada mês. As linhas tracejadas numeradas marcam as alterações à lei, listadas por baixo do gráfico. Apenas Portugal continental e Madeira',
-  }),
 
-  'home.h_leaving': entry({
-    en: 'Licences leaving the register',
-    pt: 'Licenças que saem do registo',
-  }),
-  'home.p_leaving': entry({
-    en: 'A licence is only visible as lost between two consecutive pulls of the register, so this chart starts at {from} — the first month there were two pulls to compare. It is not that nothing lapsed before then; it is that nothing could be seen to.',
-    pt: 'Uma licença só é visível como perdida entre duas recolhas consecutivas do registo, pelo que este gráfico começa em {from} — o primeiro mês com duas recolhas para comparar. Não é que nada tenha caducado antes disso; é que nada o podia demonstrar.',
-  }),
   'home.p_gap': entry({
     en: 'The register was not pulled between {from} and {to}, so those months are blank rather than zero, and every loss found in that stretch is attributed to {at}.',
     pt: 'O registo não foi recolhido entre {from} e {to}, pelo que esses meses ficam em branco e não a zero, e todas as perdas encontradas nesse intervalo são atribuídas a {at}.',
@@ -461,16 +443,8 @@ const DICT = {
   }),
 
   'area.h_over_time': entry({ en: 'Registrations over time', pt: 'Registos ao longo do tempo' }),
-  'area.cap_over_time': entry({
-    en: 'The line is the running total; bars are registrations added each month. The numbered dashed rules mark changes to the national law.',
-    pt: 'A linha é o total acumulado; as barras são os registos acrescentados em cada mês. As linhas tracejadas numeradas marcam alterações à lei nacional.',
-  }),
   'area.h_leaving': entry({ en: 'Licences leaving the register', pt: 'Licenças que saem do registo' }),
   'area.lost_aria': entry({ en: 'Lost licences', pt: 'Licenças perdidas' }),
-  'area.cap_losses': entry({
-    en: 'Losses are only visible between two pulls of the register, so this starts at {from}. The gap with no pull is left blank rather than drawn as zero.',
-    pt: 'As perdas só são visíveis entre duas recolhas do registo, pelo que isto começa em {from}. O intervalo sem recolha fica em branco em vez de ser desenhado a zero.',
-  }),
   'area.no_losses': entry({
     en: 'No registration here has been seen to leave the register since {from}, which is as far back as losses can be detected.',
     pt: 'Nenhum registo desta área foi visto a sair do registo desde {from}, que é o mais longe que é possível detetar perdas.',
@@ -499,6 +473,33 @@ const DICT = {
   'area.h_municipalities': entry({ en: 'Municipalities', pt: 'Municípios' }),
   'area.h_localities': entry({ en: 'Localities', pt: 'Freguesias' }),
   'area.h_sizes': entry({ en: 'What size are they?', pt: 'De que tamanho são?' }),
+
+  // ------------------------------------------------- the combined timeline
+  'ts.not_observable': entry({
+    en: 'losses not observable yet',
+    pt: 'perdas ainda não observáveis',
+  }),
+  'ts.not_observed_short': entry({ en: 'not observed', pt: 'não observado' }),
+  'chart.lost_month_neg': entry({
+    en: 'Left the register that month',
+    pt: 'Saíram do registo nesse mês',
+  }),
+  'home.h_flow': entry({
+    en: 'Registrations, and what stopped them',
+    pt: 'Registos, e o que os travou',
+  }),
+  'home.p_flow': entry({
+    en: 'The line is the running total. Bars above the zero line are registrations added that month; bars below it, in red, are licences that left the register. Both bars share one scale, so a month\u2019s inflow and outflow are directly comparable. Numbered dashed rules mark the changes to the law — hover one to read it.',
+    pt: 'A linha é o total acumulado. As barras acima da linha zero são os registos acrescentados nesse mês; as barras abaixo, a vermelho, são as licenças que saíram do registo. Ambas partilham a mesma escala, pelo que as entradas e as saídas de um mês são diretamente comparáveis. As linhas tracejadas numeradas marcam as alterações à lei — passe o rato sobre uma para a ler.',
+  }),
+  'home.p_flow_losses': entry({
+    en: 'A licence is only visible as lost between two consecutive pulls of the register, so the downward bars start at {from} — the first month there were two pulls to compare. It is not that nothing lapsed before then; it is that nothing could be seen to.',
+    pt: 'Uma licença só é visível como perdida entre duas recolhas consecutivas do registo, pelo que as barras descendentes começam em {from} — o primeiro mês com duas recolhas para comparar. Não é que nada tenha caducado antes disso; é que nada o podia demonstrar.',
+  }),
+  'area.cap_flow': entry({
+    en: 'The line is the running total. Bars above zero are registrations added that month; below zero, in red, are licences that left. Losses are only visible between two pulls of the register, so they start at {from}, and the stretch with no pull is left blank rather than drawn as zero.',
+    pt: 'A linha é o total acumulado. As barras acima de zero são os registos acrescentados nesse mês; abaixo de zero, a vermelho, as licenças que saíram. As perdas só são visíveis entre duas recolhas do registo, pelo que começam em {from}, e o período sem recolha fica em branco em vez de ser desenhado a zero.',
+  }),
 } satisfies Record<string, Record<Lang, string>>;
 
 export type Key = keyof typeof DICT;

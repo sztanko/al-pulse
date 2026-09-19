@@ -25,6 +25,10 @@ import './TimeSeries.css';
 export interface EventMark {
   month: string;
   label: string;
+  /** Shown when the mark is hovered or tapped. The same words as the key under
+   * the chart; the key is the accessible, always-reachable copy and this is
+   * the convenient one. */
+  description?: string | null;
 }
 
 export interface Props {
@@ -46,6 +50,20 @@ export interface Props {
   /** Month indices the register was not pulled in. Their values are not zero,
    * they are unknown, and the chart says so rather than implying a number. */
   unobserved?: number[];
+
+  /* ---- the downward series -------------------------------------------- */
+  /** Drawn below the zero line, on the same scale as `bars`. Registrations
+   * arriving and licences leaving are the two directions of one flow, and
+   * showing them as two charts made the reader hold one in their head while
+   * looking at the other. Sharing a scale is the whole point: two scales, one
+   * up and one down, would make a small outflow look like a large one. */
+  negBars?: (number | null)[];
+  negBarLabel?: string;
+  /** Index before which the downward series is not merely zero but unknown —
+   * a lapsed licence is only visible between two pulls of the register, so
+   * before the second pull there is nothing to see. */
+  negStartIndex?: number;
+  negUnobserved?: number[];
 }
 
 /** Horizontal room a policy mark needs before the next one has to drop a
@@ -54,6 +72,11 @@ const MARK_GAP = 17;
 const MARK_STEP = 16;
 
 const PAD = { top: 14, right: 54, bottom: 26, left: 52 };
+
+/** Axis-sized number: 9000 -> "9k". Bars run to four figures and the axis has
+ * 54px to say so. */
+const kilo = (v: number): string =>
+  v >= 1000 ? `${Math.round(v / 100) / 10}k` : String(Math.round(v));
 
 export default function TimeSeries({
   lang,
@@ -67,6 +90,10 @@ export default function TimeSeries({
   height = 300,
   startIndex = 0,
   unobserved = [],
+  negBars,
+  negBarLabel,
+  negStartIndex = 0,
+  negUnobserved = [],
 }: Props) {
   const f = fmt(lang);
   const label = f.monthShort;
@@ -77,6 +104,10 @@ export default function TimeSeries({
   const [w, setW] = useState(760);
   const [hover, setHover] = useState<number | null>(null);
   const [pinned, setPinned] = useState(false);
+  /** Which policy mark the pointer is on, if any. While a mark is hovered its
+   * description replaces the month readout rather than joining it: two boxes
+   * competing for the same corner is how a chart stops being readable. */
+  const [hoverEvent, setHoverEvent] = useState<number | null>(null);
   const fmtLine = lineFormat === 'pct' ? fmtPct : fmtInt;
 
   // "Not observed" is not "zero". Where no pull brackets a month, the value is
@@ -93,6 +124,22 @@ export default function TimeSeries({
     [bars, s0, unobs]
   );
 
+  // The downward series carries its own unobserved set and its own start,
+  // because the two directions became measurable at different times: arrivals
+  // are dated by the register itself and run to 2012, departures only exist
+  // from the second pull onward.
+  const negUnobs = useMemo(() => new Set(negUnobserved), [negUnobserved]);
+  const negBars2 = useMemo(() => {
+    if (!negBars) return null;
+    return negBars
+      .slice(s0)
+      .map((v, i) =>
+        negUnobs.has(i + s0) || i + s0 < negStartIndex ? null : v
+      );
+  }, [negBars, s0, negUnobs, negStartIndex]);
+  /** Where the downward series starts being knowable, on the sliced axis. */
+  const negFrom = Math.max(0, negStartIndex - s0);
+
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -106,20 +153,55 @@ export default function TimeSeries({
   const innerW = Math.max(120, w - PAD.left - PAD.right);
   const innerH = Math.max(80, height - PAD.top - PAD.bottom);
 
-  const { lineMax, barMax } = useMemo(() => {
+  const { lineMax, barMaxPos, barMaxNeg } = useMemo(() => {
     let lm = 0;
-    let bm = 0;
+    let up = 0;
+    let down = 0;
     for (const v of line2) if (v != null && v > lm) lm = v;
-    for (const v of bars2) if (v != null && v > bm) bm = v;
-    return { lineMax: lm || 1, barMax: bm || 1 };
-  }, [line2, bars2]);
+    for (const v of bars2) if (v != null && v > up) up = v;
+    for (const v of negBars2 ?? []) if (v != null && Math.abs(v) > down) down = Math.abs(v);
+    return { lineMax: lm || 1, barMaxPos: up || 1, barMaxNeg: down };
+  }, [line2, bars2, negBars2]);
 
   const n = months2.length;
   const x = useCallback(
     (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * innerW),
     [n, innerW]
   );
-  const yLine = useCallback((v: number) => innerH - (v / lineMax) * innerH, [innerH, lineMax]);
+
+  /* One figure, two stacked panels sharing an axis — the stock above, the flow
+   * below. Overlaying them was the obvious thing and it did not work: the
+   * running total climbs to six figures across the full height while the
+   * monthly flow is four figures, so the line swept straight through the bars,
+   * and one catch-up month of losses pushed the flow's zero line a third of
+   * the way down the plot. Two panels, one x-axis, one crosshair and one set
+   * of policy rules spanning both: still one chart to read, but each series
+   * gets a vertical scale it can use.
+   *
+   * Within the flow panel the two directions share a scale. Fitting each to
+   * its own half would draw a month that lost 400 licences the same size as a
+   * month that gained 9,000, which is the one thing a two-directional chart
+   * must not do. */
+  const hasFlow = negBars2 != null && barMaxNeg > 0;
+  const GAP = 14;
+  // Just over half to the stock, just under to the flow. The flow panel needs
+  // the bigger share of what is left because it carries two directions and,
+  // once a catch-up month is in it, a two-to-one spread between them.
+  const lineH = hasFlow ? Math.round((innerH - GAP) * 0.55) : innerH;
+  const flowTop = hasFlow ? lineH + GAP : 0;
+  const flowH = hasFlow ? innerH - flowTop : innerH;
+  const barScale = hasFlow
+    ? flowH / (barMaxPos + barMaxNeg)
+    : (innerH * 0.92) / barMaxPos;
+  // Zero sits below the positive band, not below the negative one. Getting
+  // this the wrong way round reserved the *outflow's* height above the line
+  // and pushed the downward bars straight out of the viewBox.
+  const baseY = hasFlow ? flowTop + barMaxPos * barScale : innerH;
+
+  const yLine = useCallback(
+    (v: number) => lineH - (v / lineMax) * lineH,
+    [lineH, lineMax]
+  );
   const barW = Math.max(1, innerW / Math.max(n, 1) - 0.6);
 
   const linePath = useMemo(() => {
@@ -151,7 +233,13 @@ export default function TimeSeries({
    * illegible exactly where the interesting legislation is. */
   const eventIdx = useMemo(() => {
     const hits = events
-      .map((e, k) => ({ i: months2.indexOf(e.month), label: e.label, n: k + 1, row: 0 }))
+      .map((e, k) => ({
+        i: months2.indexOf(e.month),
+        label: e.label,
+        description: e.description ?? null,
+        n: k + 1,
+        row: 0,
+      }))
       .filter((e) => e.i >= 0)
       .sort((a, b) => a.i - b.i);
     let lastX = -Infinity;
@@ -231,6 +319,10 @@ export default function TimeSeries({
   const hv = hover != null ? months2[hover] : null;
   const readoutLeft = hover != null ? PAD.left + x(hover) : 0;
   const flip = readoutLeft > w * 0.62;
+  const eventLeft =
+    hoverEvent != null && eventIdx[hoverEvent]
+      ? PAD.left + x(eventIdx[hoverEvent]!.i)
+      : 0;
 
   return (
     <div className="ts-wrap" ref={wrapRef}>
@@ -261,6 +353,20 @@ export default function TimeSeries({
             </g>
           ))}
 
+          {/* Left axis for the flow panel: its own two ends, so the bars are
+              drawn to a scale the chart actually names. Before the panels were
+              split the bars had no axis at all. */}
+          {hasFlow && (
+            <g className="ts-axis-flow">
+              <text className="ts-axis" x={-8} y={flowTop + 8} textAnchor="end">
+                {'+' + kilo(barMaxPos)}
+              </text>
+              <text className="ts-axis" x={-8} y={innerH} textAnchor="end">
+                {'−' + kilo(barMaxNeg)}
+              </text>
+            </g>
+          )}
+
           {/* A numbered flag, not a label. Rotated 9.5px text inside the plot
               was illegible and overlapped the data it annotated; the number is
               readable at this size and the wording lives in <EventKey> under
@@ -269,10 +375,26 @@ export default function TimeSeries({
               on the page. The <title> gives a native tooltip and an accessible
               name without making the text hover-only — the key below is always
               visible. */}
-          {eventIdx.map((e) => (
-            <g key={`ev${e.n}`} transform={`translate(${x(e.i).toFixed(2)},0)`}>
+          {eventIdx.map((e, k) => (
+            <g
+              key={`ev${e.n}`}
+              className={`ts-event-g${hoverEvent === k ? ' is-on' : ''}`}
+              transform={`translate(${x(e.i).toFixed(2)},0)`}
+              onPointerEnter={() => setHoverEvent(k)}
+              onPointerLeave={() => setHoverEvent(null)}
+            >
               <title>{`${e.n}. ${e.label}`}</title>
               <line className="ts-event" y1={0} y2={innerH} />
+              {/* A bigger invisible target than the 14px disc. Fourteen pixels
+                  is under the 24px minimum for a pointer target, and these sit
+                  close together where the interesting legislation is. */}
+              {/* The handlers are on the group, but only the discs are
+                  hit-testable — the dashed rule spans the full height of the
+                  plot, and a reader scrubbing along the months would otherwise
+                  trip the description every time the pointer crossed one.
+                  This disc is the target; the painted one on top of it is
+                  smaller than any pointer target should be. */}
+              <circle className="ts-event-hit" cy={7 + e.row * MARK_STEP} r={13} />
               <circle className="ts-event-dot" cy={7 + e.row * MARK_STEP} r={7} />
               <text
                 className="ts-event-n"
@@ -284,6 +406,26 @@ export default function TimeSeries({
             </g>
           ))}
 
+          {/* Where the downward series cannot be known yet, say so once rather
+              than leaving an empty half the reader has to interpret. An empty
+              region below the axis reads as "nothing left the register", which
+              is a claim; this is an absence of measurement. */}
+          {hasFlow && negFrom > 0 && (
+            <g className="ts-nodata">
+              <rect
+                x={0}
+                y={flowTop}
+                width={x(negFrom).toFixed(2)}
+                height={(innerH - flowTop).toFixed(2)}
+              />
+              {x(negFrom) > 130 && (
+                <text x={6} y={(baseY + 13).toFixed(2)}>
+                  {t(lang, 'ts.not_observable')}
+                </text>
+              )}
+            </g>
+          )}
+
           {bars2.map((v, i) =>
             v == null || v === 0 ? null : (
               <rect
@@ -291,10 +433,32 @@ export default function TimeSeries({
                 className="ts-bar"
                 x={(x(i) - barW / 2).toFixed(2)}
                 width={barW.toFixed(2)}
-                y={(innerH - (v / barMax) * innerH * 0.92).toFixed(2)}
-                height={((v / barMax) * innerH * 0.92).toFixed(2)}
+                y={(baseY - v * barScale).toFixed(2)}
+                height={(v * barScale).toFixed(2)}
               />
             )
+          )}
+
+          {negBars2?.map((v, i) =>
+            v == null || v === 0 ? null : (
+              <rect
+                key={`n${i}`}
+                className="ts-bar-neg"
+                x={(x(i) - barW / 2).toFixed(2)}
+                width={barW.toFixed(2)}
+                y={baseY.toFixed(2)}
+                height={(Math.abs(v) * barScale).toFixed(2)}
+              />
+            )
+          )}
+
+          {hasFlow && (
+            <>
+              <line className="ts-zero" x1={0} x2={innerW} y1={baseY} y2={baseY} />
+              <text className="ts-axis" x={-8} y={baseY + 3} textAnchor="end">
+                0
+              </text>
+            </>
           )}
 
           <path className="ts-line" d={linePath} />
@@ -302,6 +466,8 @@ export default function TimeSeries({
           {hover != null && (
             <g className="ts-cursor" transform={`translate(${x(hover).toFixed(2)},0)`}>
               <line y1={0} y2={innerH} />
+              {/* One crosshair across both panels: the flow at a month and the
+                  stock at that month are the same reading. */}
               {line2[hover] != null && <circle cy={yLine(line2[hover]!)} r={3.5} />}
             </g>
           )}
@@ -320,7 +486,25 @@ export default function TimeSeries({
         </g>
       </svg>
 
-      {hv && (
+      {hoverEvent != null && eventIdx[hoverEvent] && (
+        <div
+          className={`ts-readout is-event${narrow ? ' is-pinned' : ''}${
+            eventLeft > w * 0.62 ? ' is-flipped' : ''
+          }`}
+          style={narrow ? undefined : { left: `${eventLeft}px` }}
+          role="status"
+        >
+          <div className="ts-readout-month">
+            <span className="ts-readout-n">{eventIdx[hoverEvent]!.n}</span>
+            {eventIdx[hoverEvent]!.label}
+          </div>
+          {eventIdx[hoverEvent]!.description && (
+            <p className="ts-readout-desc">{eventIdx[hoverEvent]!.description}</p>
+          )}
+        </div>
+      )}
+
+      {hv && hoverEvent == null && (
         <div
           className={`ts-readout${narrow ? ' is-pinned' : ''}${flip ? ' is-flipped' : ''}`}
           style={narrow ? undefined : { left: `${readoutLeft}px` }}
@@ -337,6 +521,17 @@ export default function TimeSeries({
             <span>{barLabel}</span>
             <b className="num">{fmtInt(bars2[hover!] ?? null)}</b>
           </div>
+          {negBars2 && negBarLabel && (
+            <div className="ts-readout-row">
+              <i className="swatch-bar-neg" />
+              <span>{negBarLabel}</span>
+              <b className="num">
+                {hover! < negFrom
+                  ? t(lang, 'ts.not_observed_short')
+                  : fmtInt(negBars2[hover!] ?? null)}
+              </b>
+            </div>
+          )}
         </div>
       )}
     </div>

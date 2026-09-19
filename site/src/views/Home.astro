@@ -48,6 +48,7 @@ const shrinking = pk.index < last && offPeak < -0.001;
 const events = c.events.map((e) => ({
   month: e.month,
   label: (lang === 'pt' && e.event_name_pt) || e.event_name,
+  description: (lang === 'pt' && e.description_pt) || e.description,
 }));
 
 const regionRows = regions.map((r) => ({
@@ -171,29 +172,16 @@ const lastMonth = f.monthLabel(m.data_through);
 
   <AzoresNote lang={lang} mode="note" />
 
-  <h2>{t(lang, 'home.h_registrations')}</h2>
+  {/* One chart, not two. Registrations arriving and licences leaving are the
+      two directions of a single flow, and splitting them made the reader hold
+      one chart in their head while looking at the other. They share a scale,
+      so a month's inflow and outflow compare directly. */}
+  <h2>{t(lang, 'home.h_flow')}</h2>
   <p>
-    {t(lang, 'home.p_registrations')}<AzoresNote lang={lang} />
+    {t(lang, 'home.p_flow')}<AzoresNote lang={lang} />
   </p>
-  <figure>
-    <TimeSeries
-      client:load
-      lang={lang}
-      months={months}
-      line={c.series.cum_c}
-      bars={c.series.c}
-      lineLabel={t(lang, 'chart.total')}
-      barLabel={t(lang, 'chart.new_month')}
-      events={events}
-      height={320}
-    />
-    <figcaption>{t(lang, 'chart.read_hint')}</figcaption>
-  </figure>
-  <EventKey lang={lang} events={c.events} />
-
-  <h2>{t(lang, 'home.h_leaving')}</h2>
   <p>
-    {t(lang, 'home.p_leaving', { from: f.monthLabel(m.loss_observable_from) })}
+    {t(lang, 'home.p_flow_losses', { from: f.monthLabel(m.loss_observable_from) })}
     {
       m.unobserved_months.length > 0 && (
         <>
@@ -209,19 +197,22 @@ const lastMonth = f.monthLabel(m.data_through);
   </p>
   <figure>
     <TimeSeries
-      client:visible
+      client:load
       lang={lang}
       months={months}
-      line={c.series.cum_lost}
-      bars={c.series.lost}
-      lineLabel={t(lang, 'chart.lost_cum')}
-      barLabel={t(lang, 'chart.lost_month')}
+      line={c.series.cum_c}
+      bars={c.series.c}
+      lineLabel={t(lang, 'chart.total')}
+      barLabel={t(lang, 'chart.new_month')}
+      negBars={c.series.lost}
+      negBarLabel={t(lang, 'chart.lost_month_neg')}
+      negStartIndex={lossStartIndex()}
+      negUnobserved={unobservedIndices()}
       events={events}
-      height={300}
-      startIndex={lossStartIndex()}
-      unobserved={unobservedIndices()}
+      height={420}
     />
     <figcaption>
+      {t(lang, 'chart.read_hint')}{' '}
       {
         t(lang, 'home.cap_pulls', {
           n: f.num0(m.observed_months.length),
@@ -230,7 +221,7 @@ const lastMonth = f.monthLabel(m.data_through);
       }
     </figcaption>
   </figure>
-  <EventKey lang={lang} events={c.events} fromMonth={m.loss_observable_from} />
+  <EventKey lang={lang} events={c.events} />
 
   <h2>{t(lang, 'home.h_districts')}</h2>
   <p class="small faint">
