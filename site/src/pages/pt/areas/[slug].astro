@@ -1,8 +1,8 @@
 ---
 /* Thin wrapper; see views/Area.astro. One page per area per language, so the
    2,950 areas become 5,900 routes. */
-import Area from '../../views/Area.astro';
-import { areas } from '../../lib/data';
+import Area from '../../../views/Area.astro';
+import { areas } from '../../../lib/data';
 
 export function getStaticPaths() {
   return areas().map((a) => ({ params: { slug: a.slug } }));
@@ -11,4 +11,4 @@ export function getStaticPaths() {
 const { slug } = Astro.params;
 ---
 
-<Area lang="en" slug={slug!} />
+<Area lang="pt" slug={slug!} />

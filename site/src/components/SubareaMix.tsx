@@ -6,6 +6,8 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { timeTicks } from '../lib/ticks';
+import { fmt } from '../lib/format';
+import { t, type Lang } from '../lib/i18n';
 import './SubareaMix.css';
 
 export interface SeriesIn {
@@ -15,6 +17,7 @@ export interface SeriesIn {
 }
 
 export interface Props {
+  lang: Lang;
   months: string[];
   subareas: SeriesIn[];
   height?: number;
@@ -24,14 +27,15 @@ export interface Props {
 
 const PAD = { top: 12, right: 14, bottom: 26, left: 50 };
 const CATS = ['--m-cat-1','--m-cat-2','--m-cat-3','--m-cat-4','--m-cat-5','--m-cat-6','--m-cat-7','--m-cat-8'];
-const FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-const longLabel = (m: string): string => {
-  const [y, mm] = m.split('-');
-  return `${FULL[Number(mm) - 1] ?? mm} ${y}`;
-};
-
-export default function SubareaMix({ months, subareas, height = 320, maxSeries = 8 }: Props) {
+export default function SubareaMix({
+  lang,
+  months,
+  subareas,
+  height = 320,
+  maxSeries = 8,
+}: Props) {
+  const f = fmt(lang);
+  const longLabel = f.monthLabel;
   const [pct, setPct] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
   const [pinned, setPinned] = useState(false);
@@ -66,8 +70,11 @@ export default function SubareaMix({ months, subareas, height = 320, maxSeries =
     const other = months.map((_, i) =>
       rest.reduce((s, r) => s + (r.cum[i] ?? 0), 0)
     );
-    return [...keep, { name: `Other (${rest.length})`, slug: null, cum: other }];
-  }, [subareas, n, maxSeries, months]);
+    return [
+      ...keep,
+      { name: t(lang, 'mix.other', { n: String(rest.length) }), slug: null, cum: other },
+    ];
+  }, [subareas, n, maxSeries, months, lang]);
 
   /** Cumulative stack bands per month. */
   const bands = useMemo(() => {
@@ -131,7 +138,7 @@ export default function SubareaMix({ months, subareas, height = 320, maxSeries =
   }, [pinned]);
 
   const xTicks = useMemo(
-    () => timeTicks(months, 0, n - 1, narrow ? 4 : 8),
+    () => timeTicks(lang, months, 0, n - 1, narrow ? 4 : 8),
     [months, n, narrow]
   );
 
@@ -148,7 +155,7 @@ export default function SubareaMix({ months, subareas, height = 320, maxSeries =
             checked={pct}
             onChange={(e) => setPct(e.currentTarget.checked)}
           />
-          <span>Show as share of the total</span>
+          <span>{t(lang, 'mix.share_toggle')}</span>
         </label>
       </div>
 
@@ -167,7 +174,9 @@ export default function SubareaMix({ months, subareas, height = 320, maxSeries =
         height={height}
         viewBox={`0 0 ${w} ${height}`}
         role="img"
-        aria-label={`Registrations by subarea, ${pct ? 'as a share of the total' : 'absolute'}`}
+        aria-label={t(lang, 'mix.aria', {
+          mode: pct ? t(lang, 'mix.mode_share') : t(lang, 'mix.mode_absolute'),
+        })}
         tabIndex={0}
         onPointerMove={(e) => { if (!(pinned && e.pointerType === 'touch')) setHover(nearest(e.clientX)); }}
         onPointerLeave={(e) => { if (e.pointerType !== 'touch') setHover(null); }}
@@ -186,13 +195,17 @@ export default function SubareaMix({ months, subareas, height = 320, maxSeries =
         }}
       >
         <g transform={`translate(${PAD.left},${PAD.top})`}>
-          {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-            const v = yMax * f;
+          {[0, 0.25, 0.5, 0.75, 1].map((fr) => {
+            const v = yMax * fr;
             return (
-              <g key={f} transform={`translate(0,${y(v).toFixed(2)})`}>
+              <g key={fr} transform={`translate(0,${y(v).toFixed(2)})`}>
                 <line className="sm-grid" x1={0} x2={innerW} />
                 <text className="sm-axis" x={-8} y={3} textAnchor="end">
-                  {pct ? `${(f * 100).toFixed(0)}%` : v >= 1000 ? `${Math.round(v / 1000)}k` : Math.round(v)}
+                  {pct
+                    ? `${Math.round(fr * 100)}%`
+                    : v >= 1000
+                      ? `${Math.round(v / 1000)}k`
+                      : f.num0(v)}
                 </text>
               </g>
             );
@@ -231,8 +244,8 @@ export default function SubareaMix({ months, subareas, height = 320, maxSeries =
                 <span>{s.name}</span>
                 <b className="num">
                   {pct
-                    ? `${(((bands.totals[hover] ?? 0) ? v / (bands.totals[hover] ?? 1) : 0) * 100).toFixed(1)}%`
-                    : Math.round(v).toLocaleString('en-GB')}
+                    ? f.pct1((bands.totals[hover] ?? 0) ? v / (bands.totals[hover] ?? 1) : 0)
+                    : f.num0(v)}
                 </b>
               </div>
             ))}

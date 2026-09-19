@@ -1,0 +1,191 @@
+---
+import Base from '../layouts/Base.astro';
+import { meta } from '../lib/data';
+import { fmt } from '../lib/format';
+
+const m = meta();
+const { monthLabel } = fmt('en');
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const gaps = m.unobserved_months;
+---
+
+<Base
+  lang="en"
+  path="/method"
+  title="Method, and what this cannot tell you — AL Pulse"
+  active="areas"
+  description="How the AL Pulse figures are produced, and the things they cannot answer."
+>
+  <h1>Method, and what this cannot tell you</h1>
+  <p class="lede">
+    The useful question about a dashboard is not whether it has errors but
+    whether anyone is looking for them. These are the ones found so far.
+  </p>
+
+  <h2>Where the numbers come from</h2>
+  <p>
+    Every figure derives from the Registo Nacional de Turismo's public register
+    of Alojamento Local. The register is scraped month by month back to 2007,
+    transformed with dbt into DuckDB, and rendered here at build time. Nothing
+    on this site queries anything at read time.
+  </p>
+  <p>
+    Two facts are recorded per registration: when it was registered, and whether
+    it was still on the register the last time we looked. Everything else is
+    derived from those.
+  </p>
+
+  <h2>The register has been pulled {m.observed_months.length} times</h2>
+  <p>
+    This is the single most important caveat, and it shapes every chart of
+    losses. A registration that has gone can only be detected by comparing two
+    consecutive pulls — so the first month any loss is visible at all is
+    <strong>{monthLabel(m.loss_observable_from)}</strong>, one month after the
+    first pull. Before that the loss series is not zero; it is unknown, and the
+    charts leave it blank rather than draw a flat line implying that nothing
+    ever lapsed.
+  </p>
+  {
+    gaps.length > 0 && (
+      <p>
+        There is also a gap. The register was not pulled between{' '}
+        <strong>{monthLabel(gaps[0]!)}</strong> and{' '}
+        <strong>{monthLabel(gaps[gaps.length - 1]!)}</strong> — {gaps.length} months.
+        Every licence that lapsed in that window is attributed to{' '}
+        {monthLabel(m.data_through)}, because that is when it was first seen to
+        be missing. The decline was gradual; the chart shows it as a cliff. Read
+        the step as "this is what we found when we next looked", not as an event
+        in that month.
+      </p>
+    )
+  }
+  <p class="small faint">
+    Pulls so far: {m.observed_months.map(monthLabel).join(' · ')}.
+  </p>
+
+  <h2>What a "total" counts</h2>
+  <p>
+    The running total is registrations dated on or before a given month that are
+    still on the register, less those seen to have gone. Its shape is reliable;
+    its level is exact only at a pull month. Where this site names a peak, it
+    takes the peak over pull months only — a maximum inside an unobserved
+    stretch would be an artefact of when we looked.
+  </p>
+
+  <h2>Two registers, and why only one has history</h2>
+  <p>
+    Tourism is a regional competence in the autonomous regions. Madeira reports
+    into the national register; the Azores do not. Azorean operators register
+    with the Direção Regional do Turismo and receive a regional number (RRAL),
+    so the national export carries only
+    {' '}{m.azores.in_national_register.toLocaleString('en-GB')} Azorean
+    establishments against the
+    {' '}{m.azores.listings.toLocaleString('en-GB')} on the regional register.
+    This site was previously described as excluding the Azores because their
+    data was not updated. That was the wrong diagnosis — the national register
+    <em>is</em> updated for the Azores, it is simply the wrong register.
+  </p>
+  <p>
+    The regional one is published as open data
+    (<a href="https://dados.gov.pt/datasets/alojamento-local-em-funcionamento-na-regiao-autonoma-dos-acores-raa">
+      Alojamento Local em funcionamento na Região Autónoma dos Açores</a>,
+    CC-BY) and this site reads it directly, so
+    {' '}{m.azores.localities.toLocaleString('en-GB')} Azorean localities and
+    {' '}{m.azores.municipalities} municipalities now have real counts, pages
+    and map polygons.
+  </p>
+  <p>
+    <strong>It records no dates.</strong> There is no registration date column
+    and no opening date column — not stale dates, no dates. Everything on this
+    site that means <em>compared with the same thing at another time</em>
+    therefore cannot exist for the Azores:
+  </p>
+  <ul>
+    <li>no monthly series, so no chart on an Azorean area page;</li>
+    <li>no growth figure over any period;</li>
+    <li>
+      no rank, because every rank here is computed inside the monthly series.
+      Ranking an Azorean area against the national set for the current month
+      would produce a number that could not be compared with the rank movement
+      printed beside it, so the rank is shown as absent instead;
+    </li>
+    <li>
+      and no losses: a lapsed licence is only visible by comparing two pulls,
+      and the Azorean pulls start now.
+    </li>
+  </ul>
+  <p>
+    All of those read <span class="num">—</span> or <span class="num">n/a</span>
+    rather than zero. Zero is a measurement; this is an absence. Each monthly
+    pull is kept, so an Azorean series will accumulate from
+    {' '}{monthLabel(m.data_through)} forward — it just cannot be back-filled.
+  </p>
+  <p>
+    One consequence worth naming: the national headline figure on the overview
+    page excludes the Azores, and the Azorean total is shown beside it rather
+    than added into it. A single number mixing a fourteen-year series with a
+    one-month snapshot would disagree with every chart underneath it.
+  </p>
+
+  <h3>How Azorean records are placed on the map</h3>
+  <p>
+    The regional register gives each establishment a concelho, a freguesia and
+    a coordinate. The names do not match OpenStreetMap's: they disagree about
+    the freguesia for 47% of records, mostly over parenthetical qualifiers and
+    saints' names, so matching on names alone would place barely half of them.
+    Each record is therefore located by its coordinate, against the same
+    freguesia polygons the rest of the site uses —
+    {' '}99.4% land inside one. The remainder fall back to name matching and
+    then to the concelho alone; a record that resolves to no area is counted
+    nowhere and reported. Where a coordinate lands on a different island from
+    the one the register states, the coordinate is rejected rather than
+    believed.
+  </p>
+  <p>
+    The published register also carries the operator's name, e-mail and phone
+    number in every row. Those columns are dropped before anything is written
+    to disk, and a test fails the build if they reappear.
+  </p>
+
+  <h2>What is excluded</h2>
+  <ul>
+    <li>
+      <strong>Areas the geography cannot place.</strong> A registration whose
+      postcode resolves to no known locality is counted nationally but appears
+      in no area. The postcode reference data is a fixed snapshot, so postcodes
+      issued since then do not resolve.
+    </li>
+  </ul>
+
+  <h2>Personal data the source withdrew</h2>
+  <p>
+    Until 2026-09 the public export carried the operator's name, tax number and
+    contact details. It no longer does — ten columns went. Nothing on this site
+    ever used them, and historical values are not shown.
+  </p>
+
+  <h2>Known open issues</h2>
+  <ul>
+    <li>
+      Roughly 800 registrations sit on postcodes absent from the reference data
+      and so are not placed on the map.
+    </li>
+    <li>
+      Losses in an unobserved month are attributed to the next pull, as above.
+    </li>
+  </ul>
+
+  <h2>Reading the charts</h2>
+  <ul>
+    <li>Every mark answers at the pointer — hover, tap or focus and use the arrow keys.</li>
+    <li>A change smaller than half a percentage point is rendered "no change" rather than a direction.</li>
+    <li>Bars start at zero; where an axis is truncated, it is labelled.</li>
+    <li>Colour never carries meaning alone — every series is also named.</li>
+  </ul>
+
+  <p>
+    Data through {monthLabel(m.data_through)}; site built {m.generated}. The
+    pipeline and this site are open source.
+    <a href={`${base}/`}>Back to the overview</a>.
+  </p>
+</Base>

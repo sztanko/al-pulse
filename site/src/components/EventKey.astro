@@ -17,9 +17,11 @@
  * chart is given, in the same order. Both come from `events()`.
  */
 import type { EventRow } from '../lib/data';
-import { monthLabel } from '../lib/format';
+import { fmt } from '../lib/format';
+import { t, type Lang } from '../lib/i18n';
 
 interface Props {
+  lang: Lang;
   events: EventRow[];
   /** Set when the chart only draws part of the axis, so the key does not
    * explain a mark that is not on screen. */
@@ -27,7 +29,9 @@ interface Props {
   title?: string;
 }
 
-const { events, fromMonth, title = 'The dashed marks' } = Astro.props;
+const { lang, events, fromMonth, title } = Astro.props;
+const f = fmt(lang);
+const heading = title ?? t(lang, 'events.key_title');
 
 // Numbered over the full list, then filtered: a mark keeps the number it has
 // on every other chart on the page, so "3" means the same law throughout.
@@ -39,7 +43,11 @@ const shown = fromMonth ? numbered.filter((e) => e.month >= fromMonth) : numbere
   shown.length > 0 && (
     <details class="evk" open>
       <summary>
-        {title} — {shown.length} change{shown.length === 1 ? '' : 's'} to the law
+        {heading} — {
+          shown.length === 1
+            ? t(lang, 'events.key_count_one')
+            : t(lang, 'events.key_count', { n: String(shown.length) })
+        }
       </summary>
       <ol class="evk-list">
         {shown.map((e) => (
@@ -48,9 +56,9 @@ const shown = fromMonth ? numbered.filter((e) => e.month >= fromMonth) : numbere
               {e.n}
             </span>
             <div>
-              <strong>{e.event_name}</strong>{' '}
-              <span class="evk-when num">{monthLabel(e.month)}</span>
-              <p>{e.description}</p>
+              <strong>{lang === 'pt' && e.event_name_pt ? e.event_name_pt : e.event_name}</strong>{' '}
+              <span class="evk-when num">{f.monthLabel(e.month)}</span>
+              <p>{lang === 'pt' && e.description_pt ? e.description_pt : e.description}</p>
             </div>
           </li>
         ))}

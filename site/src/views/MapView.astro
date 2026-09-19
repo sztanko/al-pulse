@@ -1,0 +1,55 @@
+---
+import Base from '../layouts/Base.astro';
+import Choropleth from '../components/Choropleth.tsx';
+import { meta } from '../lib/data';
+import { fmt } from '../lib/format';
+import { langBase, t, type Lang } from '../lib/i18n';
+import AzoresNote from '../components/AzoresNote.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const m = meta();
+const f = fmt(lang);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+// The geometry is one shared file; the links out of the map are not.
+const linkBase = langBase(base, lang);
+---
+
+<Base
+  lang={lang}
+  path="/map"
+  title={t(lang, 'map.title')}
+  active="map"
+  description={t(lang, 'map.description')}
+>
+  <h1>{t(lang, 'map.h1')}</h1>
+  <p class="lede">
+    {
+      t(lang, 'map.lede', {
+        n: f.num0(m.counts.localities),
+        month: f.monthLabel(m.data_through),
+        azores: f.num0(m.azores.localities),
+      })
+    }<AzoresNote lang={lang} />{t(lang, 'map.lede_end')}
+  </p>
+
+  {/* client:only — MapLibre touches `window` at import, so it must never be
+      rendered on the server. */}
+  <Choropleth
+    client:only="react"
+    lang={lang}
+    geoUrl={`${base}/geo/localities.json`}
+    base={linkBase}
+  />
+
+  <p class="small faint" style="margin-top:0.8rem">
+    {t(lang, 'map.bins')}
+    <a href="https://openfreemap.org">OpenFreeMap</a>
+    <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>
+    {t(lang, 'map.bins_end')}
+  </p>
+  <AzoresNote lang={lang} mode="note" />
+</Base>

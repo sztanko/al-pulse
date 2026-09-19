@@ -14,6 +14,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { timeTicks } from '../lib/ticks';
+/* Both dictionaries ship to the browser rather than the strings being threaded
+ * in as props. The whole dictionary is a few kilobytes beside the geometry and
+ * MapLibre, and an island that translates itself cannot be handed the wrong
+ * language by a caller that forgot a prop. */
+import { fmt } from '../lib/format';
+import { t, type Lang } from '../lib/i18n';
 import './TimeSeries.css';
 
 export interface EventMark {
@@ -22,6 +28,7 @@ export interface EventMark {
 }
 
 export interface Props {
+  lang: Lang;
   months: string[];
   line: (number | null)[];
   bars: (number | null)[];
@@ -48,23 +55,8 @@ const MARK_STEP = 16;
 
 const PAD = { top: 14, right: 54, bottom: 26, left: 52 };
 
-const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-function label(m: string): string {
-  const [y, mm] = m.split('-');
-  return `${MONTHS[Number(mm) - 1] ?? mm} ${y}`;
-}
-
-const fmtInt = (v: number | null): string =>
-  v == null ? '—' : Math.round(v).toLocaleString('en-GB');
-
-const fmtPct = (v: number | null): string =>
-  v == null ? '—' : (v * 100).toFixed(1) + '%';
-
 export default function TimeSeries({
+  lang,
   months,
   line,
   bars,
@@ -76,6 +68,11 @@ export default function TimeSeries({
   startIndex = 0,
   unobserved = [],
 }: Props) {
+  const f = fmt(lang);
+  const label = f.monthShort;
+  const fmtInt = (v: number | null) => f.num0(v);
+  const fmtPct = (v: number | null) => f.pct1(v);
+
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [w, setW] = useState(760);
   const [hover, setHover] = useState<number | null>(null);
@@ -137,7 +134,7 @@ export default function TimeSeries({
   }, [line2, x, yLine]);
 
   const ticks = useMemo(
-    () => timeTicks(months2, 0, n - 1, narrow ? 4 : 8),
+    () => timeTicks(lang, months2, 0, n - 1, narrow ? 4 : 8),
     [months2, n, narrow]
   );
 
@@ -243,9 +240,9 @@ export default function TimeSeries({
         height={height}
         viewBox={`0 0 ${w} ${height}`}
         role="img"
-        aria-label={`${lineLabel} and ${barLabel} by month, ${label(months2[0] ?? '')} to ${label(
-          months2[n - 1] ?? ''
-        )}`}
+        aria-label={`${t(lang, 'ts.aria', { line: lineLabel, bars: barLabel })}, ${label(
+          months2[0] ?? ''
+        )} – ${label(months2[n - 1] ?? '')}`}
         tabIndex={0}
         onPointerMove={onMove}
         onPointerLeave={onLeave}

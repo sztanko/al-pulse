@@ -35,6 +35,12 @@ const ROUTES = [
   ['/areas/ponta_delgada_acores', 'azores municipality'],
   ['/areas/achada_nordeste_acores', 'azores locality'],
 ];
+
+/** The same routes in Portuguese. Overflow, covered controls and console
+ * errors are all language-dependent: Portuguese runs longer than English by a
+ * fifth or so, which is exactly how a control that fitted at 360px stops
+ * fitting. */
+const PT_ROUTES = ROUTES.map(([r, label]) => [`/pt${r === '/' ? '' : r}`, `pt ${label}`]);
 const THEMES = ['light', 'dark'];
 const VIEWPORTS = [
   { name: 'narrow', width: 360, height: 720 },
@@ -439,13 +445,113 @@ async function checkPolicyMarks(browser) {
   }
 }
 
+/** The Portuguese site must be Portuguese all the way down.
+ *
+ * Two failures this catches, both of which look fine on a screenshot:
+ * a string that was never put in the dictionary and renders in English on a
+ * Portuguese page, and a link that drops the reader back into English
+ * halfway through a session because an island was handed the unprefixed base.
+ */
+async function checkLanguages(browser) {
+  const where = 'i18n';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+
+  // Strings that must never appear on a Portuguese page. Each is a label the
+  // site renders itself, not a proper noun — "Alojamento Local" and area names
+  // are Portuguese in both languages and are deliberately absent from this list.
+  const ENGLISH_LEAKS = [
+    'Registered short-lets',
+    'Inhabitants per AL',
+    'Rank change',
+    'no change',
+    'Show all',
+    'Where it ranks',
+    'How concentrated',
+    'Licences leaving',
+    'The dashed marks',
+    'Skip to content',
+  ];
+
+  for (const route of ['/pt', '/pt/areas', '/pt/areas/lisboa', '/pt/method', '/pt/map']) {
+    await page.goto(`http://127.0.0.1:${PORT}${BASE}${route}`, {
+      waitUntil: 'networkidle',
+      timeout: 45000,
+    });
+    await scrollThrough(page);
+
+    const lang = await page.evaluate(() => document.documentElement.lang);
+    if (lang !== 'pt-PT') fail(`${where} ${route}`, `<html lang> is "${lang}", not pt-PT`);
+
+    const body = await page.evaluate(() => document.body.innerText);
+    for (const leak of ENGLISH_LEAKS) {
+      if (body.includes(leak)) fail(`${where} ${route}`, `untranslated string "${leak}"`);
+    }
+
+    // Every internal link must stay inside /pt.
+    const strays = await page.evaluate((base) => {
+      const out = [];
+      for (const a of document.querySelectorAll('a[href]')) {
+        const href = a.getAttribute('href') ?? '';
+        if (!href.startsWith(base)) continue;
+        const rest = href.slice(base.length);
+        // Assets and the language switcher's English link are allowed out.
+        if (rest.startsWith('/geo/') || rest.startsWith('/favicon')) continue;
+        if (a.closest('.lang-toggle')) continue;
+        if (!rest.startsWith('/pt')) out.push(href);
+      }
+      return out.slice(0, 5);
+    }, BASE);
+    if (strays.length) {
+      fail(`${where} ${route}`, `links leave Portuguese: ${strays.join(', ')}`);
+    }
+
+    // hreflang must name both languages and point somewhere real.
+    const alts = await page.evaluate(() =>
+      [...document.querySelectorAll('link[rel="alternate"]')].map((l) => [
+        l.getAttribute('hreflang'),
+        l.getAttribute('href'),
+      ])
+    );
+    const tags = alts.map((a) => a[0]);
+    for (const want of ['en-GB', 'pt-PT', 'x-default']) {
+      if (!tags.includes(want)) fail(`${where} ${route}`, `no hreflang="${want}"`);
+    }
+  }
+
+  // The switcher must land on the *same* page, not the front page.
+  await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/lisboa`, {
+    waitUntil: 'networkidle',
+    timeout: 45000,
+  });
+  await page.locator('.lang-toggle a').nth(1).click();
+  await page.waitForLoadState('networkidle');
+  const url = page.url();
+  if (!url.endsWith('/pt/areas/lisboa') && !url.endsWith('/pt/areas/lisboa/')) {
+    fail(where, `the switcher went to ${url}, not the same area in Portuguese`);
+  }
+  const h1 = await page.locator('h1').first().innerText();
+  if (!/Lisboa/.test(h1)) fail(where, `after switching, the page is "${h1}"`);
+
+  // And Portuguese numbers must be Portuguese: comma decimal, and the group
+  // separator is a non-breaking space rather than a comma.
+  const nums = await page.evaluate(() =>
+    [...document.querySelectorAll('.metric-value')].map((e) => e.textContent?.trim() ?? '')
+  );
+  if (nums.some((n) => /\d,\d{3}\b/.test(n))) {
+    fail(where, `English thousands separator on a Portuguese page: ${nums.join(' | ')}`);
+  }
+
+  await ctx.close();
+}
+
 const { srv, root } = serve();
 await new Promise((r) => setTimeout(r, 1200));
 
 let browser;
 try {
   browser = await chromium.launch();
-  for (const [route, label] of ROUTES) {
+  for (const [route, label] of [...ROUTES, ...PT_ROUTES]) {
     for (const theme of THEMES) {
       for (const vp of VIEWPORTS) {
         await checkPage(browser, route, label, theme, vp);
@@ -457,6 +563,7 @@ try {
   await checkRoomMix(browser);
   await checkUntimedArea(browser);
   await checkPolicyMarks(browser);
+  await checkLanguages(browser);
 } catch (e) {
   fail('harness', String(e).slice(0, 300));
 } finally {
@@ -471,5 +578,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `verify ok — ${ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas and the policy marks`
+  `verify ok — ${ROUTES.length + PT_ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas, the policy marks and both languages`
 );
