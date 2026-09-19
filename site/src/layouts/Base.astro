@@ -2,27 +2,49 @@
 import '../styles/tokens.css';
 import '../styles/base.css';
 import { meta } from '../lib/data';
+import { fmt } from '../lib/format';
+import {
+  LANGS, LANG_NAME, LANG_SHORT, LOCALE, localePath, t, type Lang,
+} from '../lib/i18n';
 
 interface Props {
   title: string;
   description?: string;
   active?: 'home' | 'map' | 'areas';
+  lang: Lang;
+  /** Path without a language prefix, e.g. `/areas/faro`. Drives the language
+   * switcher and the `hreflang` links, so the two cannot disagree about where
+   * a translation lives. */
+  path: string;
 }
 
-const { title, description, active } = Astro.props;
+const { title, description, active, lang, path } = Astro.props;
 const m = meta();
+const f = fmt(lang);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const href = (p: string) => `${base}${p}`;
+/** A link within the current language. */
+const href = (p: string) => `${base}${localePath(lang, p)}`;
+/** The same page in a given language. */
+const hrefIn = (l: Lang) => `${base}${localePath(l, path)}`;
+const site = 'https://sztanko.github.io';
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={LOCALE[lang]}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
-    <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
+    <link rel="icon" href={`${base}/favicon.svg`} type="image/svg+xml" />
+
+    {/* Both languages, plus x-default pointing at English. Without these a
+        search engine treats the two as duplicates and picks one, which for a
+        Portuguese site about Portuguese law is the wrong one. */}
+    {LANGS.map((l) => (
+      <link rel="alternate" hreflang={LOCALE[l]} href={`${site}${hrefIn(l)}`} />
+    ))}
+    <link rel="alternate" hreflang="x-default" href={`${site}${hrefIn('en')}`} />
 
     {/*
       The one place a blocking script earns its keep. Applied any later, the
@@ -45,20 +67,49 @@ const href = (p: string) => `${base}${p}`;
   </head>
 
   <body>
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">{t(lang, 'nav.skip')}</a>
 
     <header class="site-header">
       <a class="brand" href={href('/')}>AL&nbsp;Pulse</a>
       <nav>
-        <a href={href('/')} aria-current={active === 'home' ? 'page' : undefined}>Overview</a>
-        <a href={href('/map')} aria-current={active === 'map' ? 'page' : undefined}>Map</a>
-        <a href={href('/areas')} aria-current={active === 'areas' ? 'page' : undefined}>Areas</a>
-        <a href={href('/method')}>Method</a>
+        <a href={href('/')} aria-current={active === 'home' ? 'page' : undefined}>
+          {t(lang, 'nav.overview')}
+        </a>
+        <a href={href('/map')} aria-current={active === 'map' ? 'page' : undefined}>
+          {t(lang, 'nav.map')}
+        </a>
+        <a href={href('/areas')} aria-current={active === 'areas' ? 'page' : undefined}>
+          {t(lang, 'nav.areas')}
+        </a>
+        <a href={href('/method')}>{t(lang, 'nav.method')}</a>
       </nav>
-      <div class="theme-toggle" id="theme-toggle" role="group" aria-label="Colour theme">
-        <button type="button" data-theme-choice="light" title="Light">Light</button>
-        <button type="button" data-theme-choice="system" title="Follow system">Auto</button>
-        <button type="button" data-theme-choice="dark" title="Dark">Dark</button>
+      {/* Plain links, not a <select> and not JavaScript: the translation of
+          this page is a different URL, so a link is what it is. It also means
+          the switcher works before hydration and is crawlable. */}
+      <div class="lang-toggle" role="group" aria-label={t(lang, 'lang.group')}>
+        {LANGS.map((l) => (
+          <a
+            href={hrefIn(l)}
+            hreflang={LOCALE[l]}
+            lang={LOCALE[l]}
+            class={l === lang ? 'is-on' : ''}
+            aria-current={l === lang ? 'true' : undefined}
+          >
+            <span class="lang-full">{LANG_NAME[l]}</span>
+            <span class="lang-short" aria-hidden="true">{LANG_SHORT[l]}</span>
+          </a>
+        ))}
+      </div>
+      <div class="theme-toggle" id="theme-toggle" role="group" aria-label={t(lang, 'theme.group')}>
+        <button type="button" data-theme-choice="light" title={t(lang, 'theme.light.title')}>
+          {t(lang, 'theme.light')}
+        </button>
+        <button type="button" data-theme-choice="system" title={t(lang, 'theme.auto.title')}>
+          {t(lang, 'theme.auto')}
+        </button>
+        <button type="button" data-theme-choice="dark" title={t(lang, 'theme.dark.title')}>
+          {t(lang, 'theme.dark')}
+        </button>
       </div>
     </header>
 
@@ -67,14 +118,14 @@ const href = (p: string) => `${base}${p}`;
 
       <footer class="footer">
         <p>
-          Data through <strong>{m.data_through}</strong> from the Registo Nacional
-          de Turismo, and for the Azores from the Região Autónoma dos Açores'
-          own register. {m.counts.localities.toLocaleString('en-GB')} localities,
-          {' '}{m.counts.municipalities} municipalities,
-          {' '}{m.counts.regions} districts and autonomous regions.
-          The Azorean register records no dates, so those
-          {' '}{m.azores.areas} areas are counted but never charted.
-          <a href={href('/method')}>How this is built, and what it cannot tell you</a>.
+          {t(lang, 'footer.source', { month: f.monthLabel(m.data_through) })}{' '}
+          {t(lang, 'footer.counts', {
+            localities: f.num0(m.counts.localities),
+            municipalities: f.num0(m.counts.municipalities),
+            regions: f.num0(m.counts.regions),
+          })}{' '}
+          {t(lang, 'footer.azores', { n: f.num0(m.azores.areas) })}{' '}
+          <a href={href('/method')}>{t(lang, 'footer.method')}</a>.
         </p>
       </footer>
     </main>

@@ -7,6 +7,12 @@
  *  - every column sortable, and searchable.
  */
 import { useMemo, useState } from 'react';
+/* Both dictionaries ship to the browser rather than the strings being threaded
+ * in as props. The whole dictionary is a few kilobytes beside MapLibre and the
+ * geometry, and an island that can translate itself cannot be handed the wrong
+ * language by a caller that forgot a prop. */
+import { fmt } from '../lib/format';
+import { t, type Lang } from '../lib/i18n';
 import './AreaTable.css';
 
 export interface Row {
@@ -26,6 +32,7 @@ export interface Row {
 }
 
 export interface Props {
+  lang: Lang;
   rows: Row[];
   base: string;
   caption: string;
@@ -38,40 +45,28 @@ export interface Props {
 // subtract booleans.
 type Key = keyof Omit<Row, 'slug' | 'in_time_series'>;
 
-const COLUMNS: { key: Key; label: string; kind: 'text' | 'bar' | 'delta' | 'rankdelta' | 'scale' }[] =
-  [
-    { key: 'name', label: 'Area', kind: 'text' },
-    { key: 'al_count', label: 'AL count', kind: 'bar' },
-    { key: 'al_count_growth_pcnt', label: 'Growth, 3 yr', kind: 'delta' },
-    { key: 'inhabitants_per_al', label: 'Inhabitants per AL', kind: 'scale' },
-    { key: 'rank_within_country', label: 'Rank', kind: 'bar' },
-    { key: 'rank_within_country_change', label: 'Rank change', kind: 'rankdelta' },
-  ];
-
-const n0 = (v: number | null) => (v == null ? '—' : Math.round(v).toLocaleString('en-GB'));
-const p1 = (v: number | null) =>
-  v == null ? '—' : (v * 100).toFixed(1) + '%';
-
-function deltaText(v: number | null): { t: string; d: string } {
-  if (v == null) return { t: '—', d: 'flat' };
-  if (Math.abs(v) < 0.005) return { t: 'no change', d: 'flat' };
-  return { t: (v > 0 ? '+' : '−') + p1(Math.abs(v)), d: v > 0 ? 'up' : 'down' };
-}
-
-function rankText(v: number | null): { t: string; d: string } {
-  if (v == null || v === 0) return { t: 'no change', d: 'flat' };
-  const p = Math.abs(Math.round(v));
-  return v < 0 ? { t: `↑ ${p}`, d: 'up' } : { t: `↓ ${p}`, d: 'down' };
-}
+type ColKind = 'text' | 'bar' | 'delta' | 'rankdelta' | 'scale';
+const COLUMNS: { key: Key; label: Parameters<typeof t>[1]; kind: ColKind }[] = [
+  { key: 'name', label: 'table.area', kind: 'text' },
+  { key: 'al_count', label: 'table.al_count', kind: 'bar' },
+  { key: 'al_count_growth_pcnt', label: 'table.growth', kind: 'delta' },
+  { key: 'inhabitants_per_al', label: 'table.inhabitants', kind: 'scale' },
+  { key: 'rank_within_country', label: 'table.rank', kind: 'bar' },
+  { key: 'rank_within_country_change', label: 'table.rank_change', kind: 'rankdelta' },
+];
 
 /** What a cell says when the figure cannot exist rather than being unknown.
  *
- * `rankText(null)` says "no change", which for an area with no history would
+ * `rankDelta(null)` says "no change", which for an area with no history would
  * be a claim about a year that was never measured. These cells say so instead,
  * and the footnote under the table says why. */
-const NOT_APPLICABLE = 'n/a';
+const naText = (lang: Lang) => t(lang, 'table.na');
 
-export default function AreaTable({ rows, base, caption, initial = 25 }: Props) {
+
+
+export default function AreaTable({ lang, rows, base, caption, initial = 25 }: Props) {
+  const f = fmt(lang);
+  const NOT_APPLICABLE = naText(lang);
   const [sort, setSort] = useState<{ key: Key; dir: 1 | -1 }>({
     key: 'al_count',
     dir: -1,
@@ -123,11 +118,13 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
     <div className="at">
       <div className="at-head">
         <label className="at-search">
-          <span className="at-search-label">Search {caption.toLowerCase()}</span>
+          <span className="at-search-label">
+            {t(lang, 'table.search_label', { what: caption.toLowerCase() })}
+          </span>
           <input
             type="search"
             value={q}
-            placeholder={`Search ${rows.length} areas…`}
+            placeholder={t(lang, 'table.search', { n: f.num0(rows.length) })}
             onChange={(e) => setQ(e.currentTarget.value)}
           />
         </label>
@@ -153,7 +150,7 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
                   className={c.kind === 'text' ? 'col-text' : 'col-num'}
                 >
                   <button type="button" onClick={() => toggle(c.key)}>
-                    {c.label}
+                    {t(lang, c.label)}
                     <i aria-hidden="true">
                       {sort.key === c.key ? (sort.dir === 1 ? '▲' : '▼') : '↕'}
                     </i>
@@ -165,10 +162,12 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
           <tbody>
             {shown.map((r) => {
               const timed = r.in_time_series !== false;
-              const g = timed ? deltaText(r.al_count_growth_pcnt) : { t: NOT_APPLICABLE, d: 'na' };
+              const g = timed
+                ? f.delta(r.al_count_growth_pcnt)
+                : { text: NOT_APPLICABLE, dir: 'na' as const };
               const rc = timed
-                ? rankText(r.rank_within_country_change)
-                : { t: NOT_APPLICABLE, d: 'na' };
+                ? f.rankDelta(r.rank_within_country_change)
+                : { text: NOT_APPLICABLE, dir: 'na' as const };
               const alScale = scales.get('al_count') ?? 1;
               const rkScale = scales.get('rank_within_country') ?? 1;
               const ipaScale = scales.get('inhabitants_per_al') ?? 1;
@@ -180,16 +179,16 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
                   <td className="col-num">
                     <span className="cell-bar">
                       <i style={{ width: `${((r.al_count ?? 0) / alScale) * 100}%` }} />
-                      <b className="num">{n0(r.al_count)}</b>
+                      <b className="num">{f.num0(r.al_count)}</b>
                     </span>
                   </td>
-                  <td className={`col-num dir-${g.d}`}>
-                    <span className="num">{g.t}</span>
+                  <td className={`col-num dir-${g.dir}`}>
+                    <span className="num">{g.text}</span>
                   </td>
                   <td className="col-num">
                     <span className="cell-bar is-alt">
                       <i style={{ width: `${((r.inhabitants_per_al ?? 0) / ipaScale) * 100}%` }} />
-                      <b className="num">{n0(r.inhabitants_per_al)}</b>
+                      <b className="num">{f.num0(r.inhabitants_per_al)}</b>
                     </span>
                   </td>
                   <td className="col-num">
@@ -200,7 +199,7 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
                             width: `${(1 - (r.rank_within_country ?? 0) / rkScale) * 100}%`,
                           }}
                         />
-                        <b className="num">{n0(r.rank_within_country)}</b>
+                        <b className="num">{f.num0(r.rank_within_country)}</b>
                       </span>
                     ) : (
                       // No bar at all, not a zero-length one: an empty bar in a
@@ -209,8 +208,8 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
                       <span className="num dir-na">{NOT_APPLICABLE}</span>
                     )}
                   </td>
-                  <td className={`col-num dir-${rc.d}`}>
-                    <span className="num">{rc.t}</span>
+                  <td className={`col-num dir-${rc.dir}`}>
+                    <span className="num">{rc.text}</span>
                   </td>
                 </tr>
               );
@@ -221,16 +220,15 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
 
       {rows.some((r) => r.in_time_series === false) && (
         <p className="at-note small faint">
-          <span aria-hidden="true">n/a</span> — the Azores keep a separate
-          register that records no registration dates, so growth and rank
-          cannot be computed for those areas. Their AL counts are current and
-          real.
+          {t(lang, 'table.na_note')}
         </p>
       )}
 
       {filtered.length > initial && (
         <button type="button" className="at-more" onClick={() => setAll((v) => !v)}>
-          {all ? `Show first ${initial}` : `Show all ${filtered.length}`}
+          {all
+            ? t(lang, 'table.show_first', { n: f.num0(initial) })
+            : t(lang, 'table.show_all', { n: f.num0(filtered.length) })}
         </button>
       )}
     </div>

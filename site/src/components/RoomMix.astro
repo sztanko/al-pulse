@@ -8,14 +8,19 @@
  * as keyboard-only and a tapped segment would then stay silent.
  */
 import type { RoomRow } from '../lib/data';
+import { roomLabel, type Lang } from '../lib/i18n';
 
 interface Props {
+  lang: Lang;
   rows: RoomRow[];
   title?: string;
   caption?: string;
 }
 
-const { rows, title, caption } = Astro.props;
+const { lang, rows, title, caption } = Astro.props;
+/** The mart speaks English; only the label changes. Keeping the join on the
+ * canonical value means the colour of "2 rooms" is the colour of "2 quartos". */
+const label = (metric: string) => roomLabel(lang, metric);
 
 // Group by geographic level, keeping the level order the mart records.
 const byLevel = new Map<string, { name: string; level: number; parts: RoomRow[] }>();
@@ -48,7 +53,7 @@ const pct = (v: number) => (v * 100).toFixed(1) + '%';
         {ORDER.map((k) => (
           <span>
             <i style={`background: var(${TOKEN[k]})`} />
-            {k}
+            {label(k)}
           </span>
         ))}
       </div>
@@ -62,14 +67,15 @@ const pct = (v: number) => (v * 100).toFixed(1) + '%';
           <div class="rm-row">
             <div class="rm-name">{lv.name}</div>
             <div class="rm-bar" role="img" aria-label={
-              `${lv.name}: ` + parts.map((p) => `${p.metric_name} ${pct(p.value / total)}`).join(', ')
+              `${lv.name}: ` +
+              parts.map((p) => `${label(p.metric_name)} ${pct(p.value / total)}`).join(', ')
             }>
               {parts.map((p) => (
                 <span
                   class="rm-seg"
                   tabindex="0"
                   style={`width:${(p.value / total) * 100}%; background: var(${TOKEN[p.metric_name]})`}
-                  data-tip={`${p.metric_name} — ${pct(p.value / total)}`}
+                  data-tip={`${label(p.metric_name)} — ${pct(p.value / total)}`}
                 />
               ))}
             </div>

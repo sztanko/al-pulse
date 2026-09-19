@@ -1,0 +1,104 @@
+---
+import Base from '../layouts/Base.astro';
+import AreaTable from '../components/AreaTable.tsx';
+import Tabs from '../components/Tabs.astro';
+import AzoresNote from '../components/AzoresNote.astro';
+import { areasOfType, meta, type AreaRow } from '../lib/data';
+import { fmt } from '../lib/format';
+import { langBase, t, type Lang } from '../lib/i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const m = meta();
+const f = fmt(lang);
+// Links out of the tables must stay in the reader's language.
+const base = langBase(import.meta.env.BASE_URL.replace(/\/$/, ''), lang);
+
+const toRow = (x: AreaRow) => ({
+  slug: x.slug,
+  name: x.admin_type === 'locality' ? x.full_name : x.name,
+  al_count: x.al_count,
+  inhabitants_per_al: x.inhabitants_per_al,
+  al_per_1000: x.al_per_1000,
+  rank_within_country: x.rank_within_country,
+  al_count_growth_pcnt: x.al_count_growth_pcnt,
+  rank_within_country_change: x.rank_within_country_change,
+  in_time_series: x.in_time_series,
+});
+
+const regions = areasOfType('region').map(toRow);
+const municipalities = areasOfType('municipality').map(toRow);
+const localities = areasOfType('locality').map(toRow);
+---
+
+<Base
+  lang={lang}
+  path="/areas"
+  title={t(lang, 'areas.title')}
+  active="areas"
+  description={t(lang, 'areas.description')}
+>
+  <h1>{t(lang, 'areas.h1')}</h1>
+  <p class="lede">
+    {
+      t(lang, 'areas.lede', {
+        regions: f.num0(m.counts.regions),
+        municipalities: f.num0(m.counts.municipalities),
+        localities: f.num0(m.counts.localities),
+        month: f.monthLabel(m.data_through),
+      })
+    }<AzoresNote lang={lang} />
+  </p>
+
+  <AzoresNote lang={lang} mode="note" />
+
+  <Tabs
+    id="areas"
+    label={t(lang, 'areas.tab_level')}
+    tabs={[
+      { id: 'regions', label: t(lang, 'areas.tab_regions', { n: f.num0(regions.length) }) },
+      {
+        id: 'municipalities',
+        label: t(lang, 'areas.tab_municipalities', { n: f.num0(municipalities.length) }),
+      },
+      {
+        id: 'localities',
+        label: t(lang, 'areas.tab_localities', { n: f.num0(localities.length) }),
+      },
+    ]}
+  >
+    <Fragment slot="regions">
+      <AreaTable
+        client:load
+        lang={lang}
+        rows={regions}
+        base={base}
+        caption={t(lang, 'areas.caption_regions', { n: f.num0(regions.length) })}
+        initial={25}
+      />
+    </Fragment>
+    <Fragment slot="municipalities">
+      <AreaTable
+        client:visible
+        lang={lang}
+        rows={municipalities}
+        base={base}
+        caption={t(lang, 'areas.caption_municipalities', { n: f.num0(municipalities.length) })}
+        initial={25}
+      />
+    </Fragment>
+    <Fragment slot="localities">
+      <AreaTable
+        client:visible
+        lang={lang}
+        rows={localities}
+        base={base}
+        caption={t(lang, 'areas.caption_localities', { n: f.num0(localities.length) })}
+        initial={25}
+      />
+    </Fragment>
+  </Tabs>
+</Base>

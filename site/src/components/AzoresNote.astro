@@ -16,9 +16,11 @@
  * disagrees with the table above it is worse than no footnote.
  */
 import { meta } from '../lib/data';
-import { num0 } from '../lib/format';
+import { fmt } from '../lib/format';
+import { t, type Lang } from '../lib/i18n';
 
 interface Props {
+  lang: Lang;
   mode?: 'mark' | 'note';
   /** Distinguishes the note on pages that show more than one. */
   id?: string;
@@ -26,8 +28,9 @@ interface Props {
   children?: unknown;
 }
 
-const { mode = 'mark', id = 'azores-note' } = Astro.props;
+const { lang, mode = 'mark', id = 'azores-note' } = Astro.props;
 const az = meta().azores;
+const f = fmt(lang);
 ---
 
 {
@@ -35,7 +38,7 @@ const az = meta().azores;
     <a
       class="fn-mark"
       href={`#${id}`}
-      aria-label="Footnote: why the Azores are not in this figure"
+      aria-label={t(lang, 'azores.mark_label')}
     >
       *
     </a>
@@ -45,24 +48,25 @@ const az = meta().azores;
         <span class="fn-star" aria-hidden="true">
           *
         </span>
-        <strong>The Azores are counted, but never charted.</strong> Tourism is a
-        regional competence there, so Azorean operators register with the
-        Direção Regional do Turismo rather than with the national register this
-        site is built on — which holds {num0(az.in_national_register)} Azorean
-        establishments against the {num0(az.listings)} on the regional one.
-        This site reads the regional register directly, so the{' '}
-        {num0(az.localities)} Azorean localities and {num0(az.municipalities)}{' '}
-        municipalities appear in the tables and on the map with their real
-        counts.
+        <strong>{t(lang, 'azores.lead')}</strong>{' '}
+        {
+          t(lang, 'azores.p1', {
+            rnal: f.num0(az.in_national_register),
+            rral: f.num0(az.listings),
+            localities: f.num0(az.localities),
+            municipalities: f.num0(az.municipalities),
+          })
+        }
       </p>
       <p>
-        That register records <strong>no registration dates</strong> — not stale
-        dates, no date column at all. So there is nothing to plot a month
-        against: no growth line, no monthly total, no growth percentage, and no
-        rank, since every rank here is computed within the monthly series. Those
-        are shown as <span class="num">—</span> rather than as zero, because
-        zero would be a claim and this is an absence. Each pull is kept, so a
-        series will accumulate from here forward.
+        {/* Explicit {' '} around every element boundary. A literal space
+            between two expressions is collapsed away here, which produced
+            "não regista<strong>quaisquer datas" and "aparecem como— e não". */}
+        {t(lang, 'azores.p2_a')}{' '}
+        <strong>{t(lang, 'azores.p2_strong')}</strong>{' '}
+        {t(lang, 'azores.p2_b')}{' '}
+        <span class="num">—</span>{' '}
+        {t(lang, 'azores.p2_c')}
       </p>
       <slot />
     </aside>
@@ -74,7 +78,9 @@ const az = meta().azores;
     color: var(--m-primary);
     text-decoration: none;
     font-weight: 700;
-    padding: 0 0.1em;
+    /* No padding on the right: the mark is almost always followed immediately
+       by punctuation, and 0.1em there renders as "rank * ." */
+    padding: 0 0 0 0.1em;
     vertical-align: super;
     font-size: 0.8em;
     line-height: 0;

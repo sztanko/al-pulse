@@ -10,10 +10,8 @@
  *                tick and on each January
  */
 
-const SHORT = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
+import { fmt } from './format';
+import type { Lang } from './i18n';
 
 export interface Tick {
   i: number;
@@ -21,11 +19,13 @@ export interface Tick {
 }
 
 export function timeTicks(
+  lang: Lang,
   months: string[],
   from: number,
   to: number,
   want = 8
 ): Tick[] {
+  const short = fmt(lang).monthName;
   const lo = Math.max(0, from);
   const hi = Math.min(months.length - 1, to);
   const span = hi - lo + 1;
@@ -55,7 +55,7 @@ export function timeTicks(
       if (!m) continue;
       const mm = Number(m.slice(5, 7));
       if (mm === 1 || mm === 4 || mm === 7 || mm === 10) {
-        out.push({ i, text: `${SHORT[mm - 1]} ${m.slice(2, 4)}` });
+        out.push({ i, text: `${short(mm)} ${m.slice(2, 4)}` });
       }
     }
     if (out.length > want) {
@@ -72,7 +72,7 @@ export function timeTicks(
     const m = months[i];
     if (!m) continue;
     const mm = Number(m.slice(5, 7));
-    const name = SHORT[mm - 1] ?? m.slice(5, 7);
+    const name = short(mm);
     out.push({
       i,
       text: i === lo || mm === 1 ? `${name} ${m.slice(0, 4)}` : name,

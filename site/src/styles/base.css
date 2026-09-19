@@ -259,9 +259,50 @@ figcaption {
     padding-bottom: 0.15rem;
   }
   .theme-toggle button { padding-inline: 0.45rem; }
+
+  /* Keep the header at two rows. Adding the switcher as a third pushed it to
+     about 7.4rem, so `--header-h` understated it and `scroll-padding-top` put
+     every footnote target under the sticky bar. */
+  .lang-toggle { order: 1; }
+  .lang-toggle a { padding-inline: 0.5rem; }
+  .lang-full { display: none; }
+  .lang-short { display: inline; }
 }
 
 @media (max-width: 540px) {
   body { font-size: 14px; }
   .shell { width: min(1180px, 100% - 1.2rem); }
 }
+
+/* Language switcher. Same shape as the theme toggle beside it, because they do
+   the same kind of job — pick one of a small fixed set — and two controls that
+   behave alike should look alike. Links, not buttons: each is a real URL. */
+.lang-toggle {
+  display: inline-flex;
+  border: 1px solid var(--s-rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.lang-toggle a {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.82rem;
+  color: var(--s-ink-soft);
+  text-decoration: none;
+  background: none;
+  border: none;
+}
+.lang-toggle a + a { border-left: 1px solid var(--s-rule); }
+.lang-toggle a:hover { color: var(--s-ink); background: var(--s-panel-2); }
+.lang-toggle a.is-on {
+  background: var(--s-panel-2);
+  color: var(--s-ink);
+  font-weight: 600;
+}
+.lang-toggle a:focus-visible {
+  outline: 2px solid var(--s-focus);
+  outline-offset: -2px;
+}
+/* The short code is present in the DOM but hidden from both sight and the
+   accessibility tree at wide widths, and the reverse below 620px — the link's
+   accessible name stays "Português" either way. */
+.lang-short { display: none; }

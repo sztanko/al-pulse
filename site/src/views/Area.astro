@@ -1,0 +1,423 @@
+---
+import Base from '../layouts/Base.astro';
+import Metric from '../components/Metric.astro';
+import RoomMix from '../components/RoomMix.astro';
+import TimeSeries from '../components/TimeSeries.tsx';
+import GrowthExplorer from '../components/GrowthExplorer.tsx';
+import SubareaMix from '../components/SubareaMix.tsx';
+import AreaTable from '../components/AreaTable.tsx';
+import AzoresNote from '../components/AzoresNote.astro';
+import EventKey from '../components/EventKey.astro';
+import Tabs from '../components/Tabs.astro';
+import {
+  areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
+  areaBySlug, observedPeak, lossStartIndex, unobservedIndices, emptySeries,
+  type AreaRow,
+} from '../lib/data';
+import { fmt } from '../lib/format';
+import { langBase, levelLabel, t, type Lang } from '../lib/i18n';
+
+interface Props {
+  lang: Lang;
+  slug: string;
+}
+
+// `getStaticPaths` lives in the page wrappers, not here: a view is a component
+// and only a page can enumerate routes. Each language's wrapper enumerates the
+// same areas and hands the slug down.
+const { lang, slug } = Astro.props;
+const a = areaBySlug(slug)!;
+const d = shard(slug);
+const m = meta();
+const f = fmt(lang);
+const base = langBase(import.meta.env.BASE_URL.replace(/\/$/, ''), lang);
+const months = m.months;
+const last = months.length - 1;
+
+const isLocality = a.admin_type === 'locality';
+const isRegion = a.admin_type === 'region';
+
+// The Azores have no monthly series at all — their register records no
+// registration dates. Everything time-derived below is therefore computed only
+// when there is a series to compute it from, and is null otherwise; the page
+// renders an explanation where the charts would be rather than charting zeros.
+const hasSeries = d.in_time_series && d.series != null;
+const S = d.series ?? emptySeries();
+
+const threeBack = Math.max(0, last - 36);
+// The count itself survives without a series: it is this month's number, which
+// is exactly what a snapshot is.
+const total = hasSeries ? (S.cum_c[last] ?? 0) : (a.al_count ?? 0);
+const totalThen = S.cum_c[threeBack] ?? 0;
+const growth3y = hasSeries && totalThen ? total / totalThen - 1 : null;
+
+const alk = S.al_per_1000[last] ?? 0;
+const alkThen = S.al_per_1000[threeBack] ?? 0;
+const inhabPerAl = hasSeries ? (alk ? 1000 / alk : null) : (a.inhabitants_per_al ?? null);
+const inhabThen = alkThen ? 1000 / alkThen : null;
+const inhabChange =
+  hasSeries && inhabPerAl && inhabThen ? inhabPerAl / inhabThen - 1 : null;
+
+const rankC = hasSeries ? (S.rank_c[last] ?? null) : null;
+const rankCThen = hasSeries ? (S.rank_c[threeBack] ?? null) : null;
+const rankR = hasSeries ? (S.rank_r[last] ?? null) : null;
+const rankRThen = hasSeries ? (S.rank_r[threeBack] ?? null) : null;
+const rankM = hasSeries ? (S.rank_m[last] ?? null) : null;
+const rankMThen = hasSeries ? (S.rank_m[threeBack] ?? null) : null;
+
+const lost = lostSummary(S);
+const evs2 = events();
+// The island only needs a month and a short label; the key needs the prose.
+// Both are derived from the same array in the same order, which is what keeps
+// mark "3" meaning the same law in the chart and in the key beneath it.
+const evs = evs2.map((e) => ({
+  month: e.month,
+  label: (lang === 'pt' && e.event_name_pt) || e.event_name,
+}));
+
+// Peer population for the rank context line — a rank only means something
+// against the size of the set it ranks within.
+const peers = areas().filter((x) => x.admin_type === a.admin_type).length;
+
+const kids: AreaRow[] = childrenOf(a);
+const locs: AreaRow[] = isLocality ? [] : localitiesUnder(a);
+
+const toRow = (x: AreaRow) => ({
+  slug: x.slug,
+  name: x.name,
+  al_count: x.al_count,
+  inhabitants_per_al: x.inhabitants_per_al,
+  al_per_1000: x.al_per_1000,
+  rank_within_country: x.rank_within_country,
+  al_count_growth_pcnt: x.al_count_growth_pcnt,
+  rank_within_country_change: x.rank_within_country_change,
+  in_time_series: x.in_time_series,
+});
+
+const backHref = d.parent ? `${base}/areas/${d.parent.slug}` : `${base}/`;
+const backLabel = d.parent ? d.parent.name : t(lang, 'area.back_overview');
+const peerLevel = levelLabel(lang, a.admin_type, true);
+
+// Peak over observed months only — between pulls the series is interpolated
+// and its maximum is an artefact of when we looked.
+const pk = observedPeak(S.cum_c);
+const offPeak = pk.value ? total / pk.value - 1 : 0;
+const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
+---
+
+<Base
+  lang={lang}
+  path={`/areas/${slug}`}
+  title={t(lang, 'area.title', { name: d.full_name })}
+  active="areas"
+  description={t(lang, 'area.description', {
+    n: f.num0(total),
+    name: d.full_name,
+    month: f.monthLabel(m.data_through),
+  })}
+>
+  <nav class="breadcrumb" aria-label={t(lang, 'area.breadcrumb')}>
+    <a href={`${base}/`}>Portugal</a>
+    {d.parent_path && <> › <span>{d.parent_path}</span></>}
+    › <span aria-current="page">{d.name}</span>
+  </nav>
+
+  <h1>{d.full_name}</h1>
+  <p class="lede">
+    {
+      shrinking
+        ? t(lang, 'area.lede_shrinking', {
+            n: f.num0(total),
+            pct: f.pct1(Math.abs(offPeak)),
+            peak: f.num0(pk.value),
+            peakMonth: f.monthLabel(pk.month),
+          })
+        : t(lang, 'area.lede', {
+            n: f.num0(total),
+            month: f.monthLabel(m.data_through),
+          })
+    }
+    {
+      d.population != null && (
+        <>{' '}{t(lang, 'area.population', { n: f.num0(d.population) })}</>
+      )
+    }
+    {' '}<a href={backHref}>← {backLabel}</a>
+  </p>
+
+  {/* Three questions, three groups: how big it is, where it sits against
+      everywhere else, and how unevenly it is spread inside itself. Ranks in
+      particular only compare with each other, so they belong together. */}
+  <div class="metric-groups" aria-label={t(lang, 'area.headline')}>
+    <section class="metric-group" aria-labelledby="g-size">
+      <h2 class="metric-group-title" id="g-size">{t(lang, 'area.g_size')}</h2>
+      <div class="grid">
+        <Metric
+          lang={lang}
+          title={t(lang, 'area.m_registered')}
+          value={f.num0(total)}
+          change={growth3y}
+          changeLabel={t(lang, 'area.over_three')}
+        />
+        <Metric
+          lang={lang}
+          title={t(lang, 'area.m_inhab')}
+          value={inhabPerAl == null ? '—' : f.num0(inhabPerAl)}
+          change={inhabChange}
+          changeLabel={t(lang, 'area.over_three')}
+          note={t(lang, 'area.m_inhab_note')}
+        />
+      </div>
+    </section>
+
+    <section class="metric-group" aria-labelledby="g-rank">
+      <h2 class="metric-group-title" id="g-rank">{t(lang, 'area.g_rank')}</h2>
+      {/* The tiles stay, empty, rather than the group disappearing. A reader
+          looking for a rank should find the place where a rank would be and be
+          told it does not exist, not find nothing and assume they missed it. */}
+      {!hasSeries && (
+        <p class="small faint rank-na">
+          {t(lang, 'area.not_ranked')}<AzoresNote lang={lang} />
+        </p>
+      )}
+      <div class="grid">
+        <Metric
+          lang={lang}
+          title={t(lang, 'area.rank_country')}
+          value={rankC == null ? '—' : f.num0(rankC)}
+          context={t(lang, 'area.rank_of', { n: f.num0(peers), level: peerLevel })}
+          rank={rankC != null && rankCThen != null ? rankC - rankCThen : null}
+          changeLabel={t(lang, 'area.over_three')}
+        />
+        {
+          !isRegion && (
+            <Metric
+              lang={lang}
+              title={t(lang, 'area.rank_district')}
+              value={rankR == null ? '—' : f.num0(rankR)}
+              rank={rankR != null && rankRThen != null ? rankR - rankRThen : null}
+              changeLabel={t(lang, 'area.over_three')}
+            />
+          )
+        }
+        {
+          isLocality && (
+            <Metric
+              lang={lang}
+              title={t(lang, 'area.rank_municipality')}
+              value={rankM == null ? '—' : f.num0(rankM)}
+              rank={rankM != null && rankMThen != null ? rankM - rankMThen : null}
+              changeLabel={t(lang, 'area.over_three')}
+            />
+          )
+        }
+      </div>
+    </section>
+
+    {
+      !isLocality && d.skew && (
+        <section class="metric-group" aria-labelledby="g-conc">
+          <h2 class="metric-group-title" id="g-conc">{t(lang, 'area.g_conc')}</h2>
+          <div class="grid">
+            <Metric
+              lang={lang}
+              title={t(lang, 'area.m_half')}
+              value={f.pct1(d.skew.locality_rank_pcnt)}
+              note={t(lang, 'area.m_half_note', { n: f.num0(d.skew.locality_rank) })}
+            />
+            <Metric
+              lang={lang}
+              title={t(lang, 'area.m_pop')}
+              value={f.pct1(d.skew.total_population_pcnt)}
+              note={t(lang, 'area.m_pop_note')}
+            />
+          </div>
+        </section>
+      )
+    }
+  </div>
+
+  {!hasSeries && (
+    <>
+      <h2>{t(lang, 'area.h_nohistory')}</h2>
+      <p>{t(lang, 'area.p_nohistory')}</p>
+      <AzoresNote lang={lang} mode="note" />
+    </>
+  )}
+
+  {hasSeries && (
+  <>
+  <h2>{t(lang, 'area.h_over_time')}</h2>
+  <figure>
+    <TimeSeries
+      client:load
+      lang={lang}
+      months={months}
+      line={S.cum_c}
+      bars={S.c}
+      lineLabel={t(lang, 'chart.total')}
+      barLabel={t(lang, 'chart.new_month')}
+      events={evs}
+      height={300}
+    />
+    <figcaption>{t(lang, 'area.cap_over_time')}</figcaption>
+  </figure>
+  <EventKey lang={lang} events={evs2} />
+
+  <h2>{t(lang, 'area.h_leaving')}</h2>
+  <section class="grid" aria-label={t(lang, 'area.lost_aria')}>
+    <Metric
+      lang={lang}
+      title={t(lang, 'home.m_lost_month')}
+      value={f.num0(lost.lastMonth)}
+      note={t(lang, 'home.m_lost_month_note', { month: f.monthLabel(m.data_through) })}
+    />
+    <Metric
+      lang={lang}
+      title={t(lang, 'home.m_lost_ytd')}
+      value={f.num0(lost.ytd)}
+      note={t(lang, 'home.m_lost_ytd_note', {
+        n: f.num0(lost.prevYear),
+        year: String(Number(m.data_through.slice(0, 4)) - 1),
+      })}
+    />
+  </section>
+  {
+    (S.cum_lost[last] ?? 0) > 0 ? (
+      <figure>
+        <TimeSeries
+          client:visible
+          lang={lang}
+          months={months}
+          line={S.cum_lost}
+          bars={S.lost}
+          lineLabel={t(lang, 'chart.lost_cum')}
+          barLabel={t(lang, 'chart.lost_month')}
+          events={evs}
+          height={260}
+          startIndex={lossStartIndex()}
+          unobserved={unobservedIndices()}
+        />
+        <figcaption>
+          {t(lang, 'area.cap_losses', { from: f.monthLabel(m.loss_observable_from) })}
+        </figcaption>
+      </figure>
+    ) : (
+      <p class="muted small">
+        {t(lang, 'area.no_losses', { from: f.monthLabel(m.loss_observable_from) })}
+      </p>
+    )
+  }
+
+  <h2>{t(lang, 'area.h_growth')}</h2>
+  <p>{t(lang, 'area.p_growth')}</p>
+  <figure>
+    <GrowthExplorer
+      client:visible
+      lang={lang}
+      months={months}
+      hierarchy={d.hierarchy}
+      subareas={d.subareas}
+      events={evs}
+      height={330}
+    />
+  </figure>
+  <EventKey lang={lang} events={evs2} title={t(lang, 'events.same_marks')} />
+
+  </>
+  )}
+
+  {
+    hasSeries && !isLocality && d.subareas.length > 0 && (
+      <>
+        <h2>{t(lang, 'area.h_splits')}</h2>
+        <figure>
+          <SubareaMix
+            client:visible
+            lang={lang}
+            months={months}
+            subareas={d.subareas}
+            height={320}
+          />
+          <figcaption>{t(lang, 'area.cap_splits')}</figcaption>
+        </figure>
+      </>
+    )
+  }
+
+  {
+    isRegion && kids.length > 0 && locs.length > 0 && (
+      <Tabs
+        id="lists"
+        label={t(lang, 'area.lists_label')}
+        tabs={[
+          {
+            id: 'municipalities',
+            label: t(lang, 'areas.tab_municipalities', { n: f.num0(kids.length) }),
+          },
+          { id: 'localities', label: t(lang, 'areas.tab_localities', { n: f.num0(locs.length) }) },
+        ]}
+      >
+        <Fragment slot="municipalities">
+          <AreaTable
+            client:visible
+            lang={lang}
+            rows={kids.map(toRow)}
+            base={base}
+            caption={t(lang, 'areas.caption_municipalities', { n: f.num0(kids.length) })}
+          />
+        </Fragment>
+        <Fragment slot="localities">
+          <AreaTable
+            client:visible
+            lang={lang}
+            rows={locs.map(toRow)}
+            base={base}
+            caption={t(lang, 'area.every_locality', { name: d.name, n: f.num0(locs.length) })}
+          />
+        </Fragment>
+      </Tabs>
+    )
+  }
+  {
+    isRegion && kids.length > 0 && locs.length === 0 && (
+      <>
+        <h2>{t(lang, 'area.h_municipalities')}</h2>
+        <AreaTable
+          client:visible
+          lang={lang}
+          rows={kids.map(toRow)}
+          base={base}
+          caption={t(lang, 'areas.caption_municipalities', { n: f.num0(kids.length) })}
+        />
+      </>
+    )
+  }
+  {
+    !isRegion && !isLocality && kids.length > 0 && (
+      <>
+        <h2>{t(lang, 'area.h_localities')}</h2>
+        <AreaTable
+          client:visible
+          lang={lang}
+          rows={kids.map(toRow)}
+          base={base}
+          caption={t(lang, 'areas.caption_localities', { n: f.num0(kids.length) })}
+        />
+      </>
+    )
+  }
+
+  {
+    d.rooms.length > 0 && (
+      <>
+        <h2>{t(lang, 'area.h_sizes')}</h2>
+        <RoomMix
+          lang={lang}
+          rows={d.rooms}
+          caption={t(lang, 'rooms.caption_area', { name: d.name })}
+        />
+      </>
+    )
+  }
+</Base>

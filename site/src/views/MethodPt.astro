@@ -1,0 +1,214 @@
+---
+/* The Portuguese method page.
+ *
+ * One file per language rather than a page assembled from dictionary keys.
+ * This is two pages of dense running text, and running text has to be
+ * *written* in each language, not reassembled from fragments — the sentences
+ * do not break in the same places, and a translation stitched together from
+ * fifty lookups reads like one.
+ *
+ * The figures are still derived, not typed: the same `meta()` the English page
+ * reads. A number that has to be updated in two files is a number that will be
+ * wrong in one of them.
+ */
+import Base from '../layouts/Base.astro';
+import { meta } from '../lib/data';
+import { fmt } from '../lib/format';
+
+const m = meta();
+const f = fmt('pt');
+const { monthLabel, num0 } = f;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const gaps = m.unobserved_months;
+---
+
+<Base
+  lang="pt"
+  path="/method"
+  title="Metodologia, e o que isto não lhe consegue dizer — AL Pulse"
+  active="areas"
+  description="Como são produzidos os números do AL Pulse, e aquilo a que não conseguem responder."
+>
+  <h1>Metodologia, e o que isto não lhe consegue dizer</h1>
+  <p class="lede">
+    A pergunta útil sobre um painel não é se tem erros, mas se alguém anda à
+    procura deles. Estes são os que se encontraram até agora.
+  </p>
+
+  <h2>De onde vêm os números</h2>
+  <p>
+    Todos os valores derivam do registo público de Alojamento Local do Registo
+    Nacional de Turismo. O registo é recolhido mês a mês desde 2007,
+    transformado com dbt para DuckDB e apresentado aqui em tempo de construção.
+    Nada neste site consulta o que quer que seja no momento da leitura.
+  </p>
+  <p>
+    São dois os factos registados por cada inscrição: quando foi registada e se
+    ainda constava do registo da última vez que olhámos. Todo o resto deriva
+    desses dois.
+  </p>
+
+  <h2>O registo foi recolhido {num0(m.observed_months.length)} vezes</h2>
+  <p>
+    Esta é a ressalva mais importante de todas, e condiciona todos os gráficos
+    de perdas. Um registo que desapareceu só pode ser detetado comparando duas
+    recolhas consecutivas — pelo que o primeiro mês em que qualquer perda é
+    sequer visível é <strong>{monthLabel(m.loss_observable_from)}</strong>, um
+    mês depois da primeira recolha. Antes disso a série de perdas não é zero: é
+    desconhecida, e os gráficos deixam-na em branco em vez de desenharem uma
+    linha plana a sugerir que nunca nada caducou.
+  </p>
+  {
+    gaps.length > 0 && (
+      <p>
+        Há também um intervalo. O registo não foi recolhido entre{' '}
+        <strong>{monthLabel(gaps[0]!)}</strong> e{' '}
+        <strong>{monthLabel(gaps[gaps.length - 1]!)}</strong> — {num0(gaps.length)} meses.
+        Todas as licenças que caducaram nessa janela são atribuídas a{' '}
+        {monthLabel(m.data_through)}, porque foi então que se viu pela primeira
+        vez que faltavam. A queda foi gradual; o gráfico mostra-a como um
+        degrau. Leia esse degrau como «foi isto que encontrámos da próxima vez
+        que olhámos», e não como um acontecimento desse mês.
+      </p>
+    )
+  }
+  <p class="small faint">
+    Recolhas até agora: {m.observed_months.map(monthLabel).join(' · ')}.
+  </p>
+
+  <h2>O que um «total» conta</h2>
+  <p>
+    O total acumulado são os registos com data igual ou anterior a um dado mês
+    que ainda constam do registo, menos aqueles que se viu terem desaparecido. A
+    sua forma é fiável; o seu nível só é exato num mês de recolha. Onde este
+    site indica um máximo, toma-o apenas sobre os meses de recolha — um máximo
+    dentro de um período não observado seria um artefacto de quando olhámos.
+  </p>
+
+  <h2>Dois registos, e porque é que só um tem histórico</h2>
+  <p>
+    Nas regiões autónomas, o turismo é uma competência regional. A Madeira
+    reporta ao registo nacional; os Açores não. Os operadores açorianos
+    registam-se na Direção Regional do Turismo e recebem um número regional
+    (RRAL), pelo que a exportação nacional tem apenas
+    {' '}{num0(m.azores.in_national_register)} estabelecimentos açorianos contra
+    os {num0(m.azores.listings)} do registo regional. Este site descrevia
+    anteriormente a exclusão dos Açores por os seus dados não serem
+    atualizados. O diagnóstico estava errado — o registo nacional <em>é</em>{' '}
+    atualizado para os Açores; é apenas o registo errado.
+  </p>
+  <p>
+    O regional está publicado em dados abertos
+    (<a href="https://dados.gov.pt/datasets/alojamento-local-em-funcionamento-na-regiao-autonoma-dos-acores-raa">
+      Alojamento Local em funcionamento na Região Autónoma dos Açores</a>,
+    CC-BY) e este site lê-o diretamente, pelo que
+    {' '}{num0(m.azores.localities)} freguesias açorianas e
+    {' '}{num0(m.azores.municipalities)} municípios passam a ter contagens
+    reais, páginas próprias e polígonos no mapa.
+  </p>
+  <p>
+    <strong>Não regista datas.</strong> Não há coluna de data de registo nem de
+    data de abertura — não são datas desatualizadas, não há datas. Tudo o que
+    neste site significa <em>comparado com a mesma coisa noutro momento</em>{' '}
+    não pode, por isso, existir para os Açores:
+  </p>
+  <ul>
+    <li>sem série mensal, logo sem gráfico numa página de área açoriana;</li>
+    <li>sem valor de crescimento para qualquer período;</li>
+    <li>
+      sem posição, porque todas as posições aqui são calculadas dentro da série
+      mensal. Classificar uma área açoriana face ao conjunto nacional no mês
+      corrente produziria um número que não poderia ser comparado com a
+      variação de posição impressa ao lado, pelo que a posição aparece antes
+      como ausente;
+    </li>
+    <li>
+      e sem perdas: uma licença caducada só é visível comparando duas recolhas,
+      e as recolhas açorianas começam agora.
+    </li>
+  </ul>
+  <p>
+    Todos esses casos aparecem como <span class="num">—</span> ou{' '}
+    <span class="num">n/d</span>, e não como zero. Zero é uma medição; isto é
+    uma ausência. Cada recolha mensal é guardada, pelo que uma série açoriana se
+    irá acumulando a partir de {monthLabel(m.data_through)} — apenas não pode
+    ser preenchida para trás.
+  </p>
+  <p>
+    Uma consequência que vale a pena nomear: o número principal nacional, na
+    página de visão geral, exclui os Açores, e o total açoriano é apresentado ao
+    lado em vez de somado. Um único número a misturar uma série de catorze anos
+    com uma fotografia de um mês estaria em contradição com todos os gráficos
+    por baixo dele.
+  </p>
+
+  <h3>Como os registos açorianos são colocados no mapa</h3>
+  <p>
+    O registo regional dá a cada estabelecimento um concelho, uma freguesia e
+    uma coordenada. Os nomes não coincidem com os do OpenStreetMap: divergem
+    quanto à freguesia em 47% dos registos, sobretudo por causa de qualificativos
+    entre parênteses e de nomes de santos, pelo que uma correspondência apenas
+    por nome colocaria pouco mais de metade. Cada registo é por isso localizado
+    pela sua coordenada, contra os mesmos polígonos de freguesia que o resto do
+    site usa — {' '}99,4% caem dentro de um. Os restantes recorrem à
+    correspondência por nome e depois apenas ao concelho; um registo que não
+    resolva para nenhuma área não é contado em lado nenhum e é reportado. Quando
+    uma coordenada cai numa ilha diferente daquela que o registo indica, a
+    coordenada é rejeitada em vez de acreditada.
+  </p>
+  <p>
+    O registo publicado traz também o nome, o e-mail e o telefone do titular em
+    todas as linhas. Essas colunas são eliminadas antes de seja o que for ser
+    escrito em disco, e um teste faz falhar a construção se reaparecerem.
+  </p>
+
+  <h2>O que fica de fora</h2>
+  <ul>
+    <li>
+      <strong>Áreas que a geografia não consegue situar.</strong> Um registo
+      cujo código postal não corresponde a nenhuma freguesia conhecida é contado
+      a nível nacional mas não aparece em nenhuma área. Os dados de referência
+      dos códigos postais são uma fotografia fixa, pelo que códigos emitidos
+      depois disso não resolvem.
+    </li>
+  </ul>
+
+  <h2>Dados pessoais que a fonte retirou</h2>
+  <p>
+    Até 2026-09 a exportação pública trazia o nome, o número de contribuinte e
+    os contactos do titular. Já não traz — desapareceram dez colunas. Nada neste
+    site alguma vez os usou, e os valores históricos não são apresentados.
+  </p>
+
+  <h2>Problemas conhecidos em aberto</h2>
+  <ul>
+    <li>
+      Cerca de 800 registos assentam em códigos postais ausentes dos dados de
+      referência e, por isso, não são colocados no mapa.
+    </li>
+    <li>
+      As perdas num mês não observado são atribuídas à recolha seguinte, como
+      acima.
+    </li>
+  </ul>
+
+  <h2>Como ler os gráficos</h2>
+  <ul>
+    <li>
+      Cada marca responde junto do ponteiro — passe o rato, toque ou foque e use
+      as setas.
+    </li>
+    <li>
+      Uma variação inferior a meio ponto percentual é apresentada como «sem
+      alteração» e não como uma direção.
+    </li>
+    <li>As barras começam em zero; quando um eixo é truncado, está assinalado.</li>
+    <li>A cor nunca transporta significado sozinha — cada série é também nomeada.</li>
+  </ul>
+
+  <p>
+    Dados até {monthLabel(m.data_through)}; site construído a {m.generated}. A
+    pipeline e este site são de código aberto.
+    <a href={`${base}/pt`}>Voltar à visão geral</a>.
+  </p>
+</Base>

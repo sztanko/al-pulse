@@ -1,0 +1,263 @@
+---
+import Base from '../layouts/Base.astro';
+import Metric from '../components/Metric.astro';
+import RoomMix from '../components/RoomMix.astro';
+import AzoresNote from '../components/AzoresNote.astro';
+import EventKey from '../components/EventKey.astro';
+import TimeSeries from '../components/TimeSeries.tsx';
+import AreaTable from '../components/AreaTable.tsx';
+import {
+  meta, country, areasOfType, lostSummary, observedPeak,
+  lossStartIndex, unobservedIndices,
+} from '../lib/data';
+import { fmt } from '../lib/format';
+import { langBase, t, type Lang } from '../lib/i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const m = meta();
+const c = country();
+const f = fmt(lang);
+const regions = areasOfType('region');
+const base = langBase(import.meta.env.BASE_URL.replace(/\/$/, ''), lang);
+
+const months = m.months;
+const last = months.length - 1;
+const total = c.series.cum_c[last] ?? 0;
+const lost = lostSummary(c.series);
+
+// Every number in prose is derived, never typed: a hardcoded figure in a
+// heading goes stale silently and is always wrong within a week. That goes
+// double once the same sentence exists in two languages.
+const threeYearsAgo = Math.max(0, last - 36);
+const totalThen = c.series.cum_c[threeYearsAgo] ?? 0;
+const growth3y = totalThen ? total / totalThen - 1 : null;
+
+// The peak is taken over *observed* months only. Between two pulls the series
+// is an interpolation, and its local maximum is an artefact of when we looked
+// rather than anything the register did.
+const pk = observedPeak(c.series.cum_c);
+const offPeak = pk.value ? total / pk.value - 1 : 0;
+const shrinking = pk.index < last && offPeak < -0.001;
+
+// The mark on the chart carries the name in the reader's language; the key
+// under it carries the prose. Both come from the same array in the same order.
+const events = c.events.map((e) => ({
+  month: e.month,
+  label: (lang === 'pt' && e.event_name_pt) || e.event_name,
+}));
+
+const regionRows = regions.map((r) => ({
+  slug: r.slug,
+  name: r.name,
+  al_count: r.al_count,
+  inhabitants_per_al: r.inhabitants_per_al,
+  al_per_1000: r.al_per_1000,
+  rank_within_country: r.rank_within_country,
+  al_count_growth_pcnt: r.al_count_growth_pcnt,
+  rank_within_country_change: r.rank_within_country_change,
+  in_time_series: r.in_time_series,
+}));
+
+const firstMonth = f.monthLabel(months[0] ?? '');
+const lastMonth = f.monthLabel(m.data_through);
+---
+
+<Base
+  lang={lang}
+  path="/"
+  title={t(lang, 'home.title')}
+  active="home"
+  description={t(lang, 'home.description', { from: firstMonth, to: lastMonth })}
+>
+  <h1>{t(lang, 'home.h1')}</h1>
+
+  <p class="lede">
+    {t(lang, 'home.lede', { from: firstMonth, to: lastMonth })}{' '}
+    {
+      shrinking
+        ? t(lang, 'home.lede_shrinking', {
+            peak: f.num0(pk.value),
+            peakMonth: f.monthLabel(pk.month),
+            total: f.num0(total),
+            pct: f.pct1(Math.abs(offPeak)),
+          })
+        : t(lang, 'home.lede_growing', { total: f.num0(total) })
+    }
+  </p>
+
+  {/* Grouped, because these five numbers answer three different questions:
+      how big the register is, what is leaving it, and how unevenly it sits on
+      the map. Laid out as one flat row they read as a single list of facts of
+      equal kind, which they are not. */}
+  <div class="metric-groups" aria-label={t(lang, 'home.g_register')}>
+    <section class="metric-group" aria-labelledby="g-size">
+      <h2 class="metric-group-title" id="g-size">{t(lang, 'home.g_register')}</h2>
+      <div class="grid">
+        <Metric
+          lang={lang}
+          title={t(lang, 'home.m_registered')}
+          value={f.num0(total)}
+          change={growth3y}
+          changeLabel={t(lang, 'home.m_over_three')}
+          note={t(lang, 'home.m_registered_note')}
+        />
+        {/* Shown as its own figure rather than folded into the total. Adding
+            them would produce a number with two different meanings in it — one
+            half a monthly series running to 2012, the other half a snapshot
+            taken this month — and every chart on the page would then disagree
+            with the headline above it. */}
+        <Metric
+          lang={lang}
+          title={t(lang, 'home.m_azores')}
+          value={f.num0(m.azores.listings)}
+          note={t(lang, 'home.m_azores_note', {
+            municipalities: f.num0(m.azores.municipalities),
+            localities: f.num0(m.azores.localities),
+          })}
+        />
+      </div>
+    </section>
+
+    <section class="metric-group" aria-labelledby="g-lost">
+      <h2 class="metric-group-title" id="g-lost">{t(lang, 'home.g_leaving')}</h2>
+      <div class="grid">
+        <Metric
+          lang={lang}
+          title={t(lang, 'home.m_lost_month')}
+          value={f.num0(lost.lastMonth)}
+          note={t(lang, 'home.m_lost_month_note', { month: lastMonth })}
+        />
+        <Metric
+          lang={lang}
+          title={t(lang, 'home.m_lost_ytd')}
+          value={f.num0(lost.ytd)}
+          note={t(lang, 'home.m_lost_ytd_note', {
+            n: f.num0(lost.prevYear),
+            year: String(Number(m.data_through.slice(0, 4)) - 1),
+          })}
+        />
+      </div>
+    </section>
+
+    {
+      c.skew && (
+        <section class="metric-group" aria-labelledby="g-conc">
+          <h2 class="metric-group-title" id="g-conc">{t(lang, 'home.g_concentrated')}</h2>
+          <div class="grid">
+            <Metric
+              lang={lang}
+              title={t(lang, 'home.m_half')}
+              value={f.pct1(c.skew.locality_rank_pcnt)}
+              note={t(lang, 'home.m_half_note', {
+                rank: f.num0(c.skew.locality_rank),
+                total: f.num0(m.counts.localities - m.azores.localities),
+              })}
+            />
+            <Metric
+              lang={lang}
+              title={t(lang, 'home.m_pop')}
+              value={f.pct1(c.skew.total_population_pcnt)}
+              note={t(lang, 'home.m_pop_note')}
+            />
+          </div>
+        </section>
+      )
+    }
+  </div>
+
+  <AzoresNote lang={lang} mode="note" />
+
+  <h2>{t(lang, 'home.h_registrations')}</h2>
+  <p>
+    {t(lang, 'home.p_registrations')}<AzoresNote lang={lang} />
+  </p>
+  <figure>
+    <TimeSeries
+      client:load
+      lang={lang}
+      months={months}
+      line={c.series.cum_c}
+      bars={c.series.c}
+      lineLabel={t(lang, 'chart.total')}
+      barLabel={t(lang, 'chart.new_month')}
+      events={events}
+      height={320}
+    />
+    <figcaption>{t(lang, 'chart.read_hint')}</figcaption>
+  </figure>
+  <EventKey lang={lang} events={c.events} />
+
+  <h2>{t(lang, 'home.h_leaving')}</h2>
+  <p>
+    {t(lang, 'home.p_leaving', { from: f.monthLabel(m.loss_observable_from) })}
+    {
+      m.unobserved_months.length > 0 && (
+        <>
+          {' '}
+          {t(lang, 'home.p_gap', {
+            from: f.monthLabel(m.unobserved_months[0]!),
+            to: f.monthLabel(m.unobserved_months[m.unobserved_months.length - 1]!),
+            at: lastMonth,
+          })}
+        </>
+      )
+    }
+  </p>
+  <figure>
+    <TimeSeries
+      client:visible
+      lang={lang}
+      months={months}
+      line={c.series.cum_lost}
+      bars={c.series.lost}
+      lineLabel={t(lang, 'chart.lost_cum')}
+      barLabel={t(lang, 'chart.lost_month')}
+      events={events}
+      height={300}
+      startIndex={lossStartIndex()}
+      unobserved={unobservedIndices()}
+    />
+    <figcaption>
+      {
+        t(lang, 'home.cap_pulls', {
+          n: f.num0(m.observed_months.length),
+          first: f.monthLabel(m.observed_months[0]!),
+        })
+      }
+    </figcaption>
+  </figure>
+  <EventKey lang={lang} events={c.events} fromMonth={m.loss_observable_from} />
+
+  <h2>{t(lang, 'home.h_districts')}</h2>
+  <p class="small faint">
+    {t(lang, 'home.p_districts')}<AzoresNote lang={lang} />
+  </p>
+  <figure>
+    <AreaTable
+      client:visible
+      lang={lang}
+      rows={regionRows}
+      base={base}
+      caption={t(lang, 'areas.caption_regions', { n: f.num0(regions.length) })}
+      initial={25}
+    />
+    <figcaption>{t(lang, 'home.cap_districts')}</figcaption>
+  </figure>
+
+  {
+    c.rooms.length > 0 && (
+      <>
+        <h2>{t(lang, 'home.h_sizes')}</h2>
+        <RoomMix
+          lang={lang}
+          rows={c.rooms}
+          caption={t(lang, 'rooms.caption_national')}
+        />
+      </>
+    )
+  }
+</Base>
