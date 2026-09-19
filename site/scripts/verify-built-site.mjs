@@ -376,6 +376,69 @@ async function checkUntimedArea(browser) {
   await ctx.close();
 }
 
+/** Policy marks: one per law, none on top of another, each explained.
+ *
+ * Overlap is width-dependent — at 1280px the six marks sit comfortably apart
+ * and at 360px four of them land within 13 pixels of each other, so a check at
+ * one width proves nothing about the other. This measures both.
+ */
+async function checkPolicyMarks(browser) {
+  const where = 'policy marks';
+  for (const vp of [
+    { name: 'narrow', width: 360, height: 900 },
+    { name: 'wide', width: 1280, height: 900 },
+  ]) {
+    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+    const page = await ctx.newPage();
+    await page.goto(`http://127.0.0.1:${PORT}${BASE}/`, {
+      waitUntil: 'networkidle',
+      timeout: 45000,
+    });
+    await scrollThrough(page);
+
+    const boxes = await page.locator('.ts-event-dot').evaluateAll((els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height };
+      })
+    );
+    if (boxes.length < 4) {
+      fail(`${where} [${vp.name}]`, `only ${boxes.length} marks drawn; expected the changes to the law`);
+      await ctx.close();
+      continue;
+    }
+
+    // Every pair must be separated on one axis or the other.
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        const overlaps =
+          a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        if (overlaps) {
+          fail(
+            `${where} [${vp.name}]`,
+            `marks ${i + 1} and ${j + 1} overlap (${Math.round(a.x)},${Math.round(a.y)} vs ${Math.round(b.x)},${Math.round(b.y)})`
+          );
+        }
+      }
+    }
+
+    // Every mark must have an entry in the key, or the number means nothing.
+    const keyed = await page.locator('.evk-list li').count();
+    if (keyed < boxes.length) {
+      fail(`${where} [${vp.name}]`, `${boxes.length} marks drawn but only ${keyed} explained`);
+    }
+    // And the key must carry the prose, not just the name.
+    const text = await page.locator('.evk-list').first().innerText();
+    if (!/Mais Habita/i.test(text) || text.length < 300) {
+      fail(`${where} [${vp.name}]`, 'the key does not carry the descriptions');
+    }
+
+    await ctx.close();
+  }
+}
+
 const { srv, root } = serve();
 await new Promise((r) => setTimeout(r, 1200));
 
@@ -393,6 +456,7 @@ try {
   await checkTabs(browser);
   await checkRoomMix(browser);
   await checkUntimedArea(browser);
+  await checkPolicyMarks(browser);
 } catch (e) {
   fail('harness', String(e).slice(0, 300));
 } finally {
@@ -407,5 +471,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `verify ok — ${ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix and the untimed areas`
+  `verify ok — ${ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas and the policy marks`
 );
