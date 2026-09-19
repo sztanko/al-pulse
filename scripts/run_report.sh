@@ -10,8 +10,9 @@
 #
 #   1. install site dependencies          (provides mapshaper)
 #   2. export locality geometry           -> site/public/geo   (served)
-#   3. export the JSON payloads           -> site/data         (build-time only)
-#   4. build                               -> site/dist
+#   3. export the district drawings       -> site/public/geo   (served)
+#   4. export the JSON payloads           -> site/data         (build-time only)
+#   5. build                               -> site/dist
 #
 # Node 22 (see site/.nvmrc): the duckdb npm package only ships prebuilt
 # binaries per Node ABI and the system default is newer than anything with
@@ -26,6 +27,9 @@ fi
 
 echo "Exporting locality geometry..."
 ./scripts/export_to_geojson.sh localities_with_data_for_geojson
+
+echo "Exporting district drawings..."
+python scripts/export_district_art.py
 
 echo "Exporting site payloads..."
 python scripts/export_site_data.py

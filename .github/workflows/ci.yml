@@ -86,7 +86,11 @@ jobs:
                    site/dist/method/index.html site/dist/areas/index.html \
                    site/dist/pt/index.html site/dist/pt/map/index.html \
                    site/dist/pt/method/index.html site/dist/pt/areas/index.html \
-                   site/dist/geo/localities.json; do
+                   site/dist/geo/localities.json \
+                   site/dist/geo/districts/faro.json; do
             test -s "$p" || { echo "missing or empty: $p"; exit 1; }
           done
+          DRAWINGS=$(ls site/dist/geo/districts/*.json | wc -l)
+          echo "district drawings: $DRAWINGS"
+          test "$DRAWINGS" -eq 20 || { echo "expected 20 district drawings"; exit 1; }
           echo "output looks right"
