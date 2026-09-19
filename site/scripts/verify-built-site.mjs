@@ -635,6 +635,106 @@ async function checkCombinedTimeline(browser) {
   await ctx.close();
 }
 
+/** The district portrait.
+ *
+ * Decorative, so nothing on the page depends on it — which is exactly why it
+ * needs checking: if it silently stopped drawing, nothing else would fail. The
+ * two failures it has actually had were a brush name that does not exist in
+ * the shipped build, and a canvas cleared to opaque white, which is invisible
+ * on a light page and a white slab on a dark one.
+ */
+async function checkDistrictArt(browser) {
+  const where = 'district art';
+
+  /** Fraction of the canvas that is not the background colour. */
+  const inkShare = async (page) =>
+    page.evaluate(() => {
+      const c = document.querySelector('.dart-canvas');
+      if (!c) return null;
+      const tmp = document.createElement('canvas');
+      tmp.width = c.width;
+      tmp.height = c.height;
+      const ctx = tmp.getContext('2d');
+      ctx.drawImage(c, 0, 0);
+      const d = ctx.getImageData(0, 0, tmp.width, tmp.height).data;
+      // The corner is background by construction — the drawing is inset.
+      const bg = [d[0], d[1], d[2]];
+      let drawn = 0;
+      const total = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) {
+        if (
+          Math.abs(d[i] - bg[0]) > 10 ||
+          Math.abs(d[i + 1] - bg[1]) > 10 ||
+          Math.abs(d[i + 2] - bg[2]) > 10
+        ) {
+          drawn++;
+        }
+      }
+      return { bg, share: drawn / total };
+    });
+
+  for (const theme of ['light', 'dark']) {
+    const ctx = await browser.newContext({ viewport: { width: 1180, height: 900 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 160)));
+
+    await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/faro`, {
+      waitUntil: 'networkidle',
+      timeout: 45000,
+    });
+    await page.evaluate((t) => {
+      localStorage.setItem('al-theme', t);
+      document.documentElement.setAttribute('data-theme', t);
+    }, theme);
+    await page.reload({ waitUntil: 'networkidle', timeout: 45000 });
+
+    try {
+      await page.waitForSelector('.dart-canvas.is-drawn', { timeout: 20000 });
+    } catch {
+      fail(`${where} [${theme}]`, `never finished drawing${errors.length ? ': ' + errors[0] : ''}`);
+      await ctx.close();
+      continue;
+    }
+
+    const ink = await inkShare(page);
+    if (!ink) {
+      fail(`${where} [${theme}]`, 'no canvas');
+    } else {
+      // A blank canvas and a drawn one are the same size and the same element.
+      if (ink.share < 0.05) {
+        fail(`${where} [${theme}]`, `only ${(ink.share * 100).toFixed(1)}% of the canvas is drawn on`);
+      }
+      // The canvas must sit on the page's own background, not on white.
+      const pageBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      const want = (pageBg.match(/\d+/g) ?? []).slice(0, 3).map(Number);
+      const off = want.map((v, i) => Math.abs(v - ink.bg[i]));
+      if (Math.max(...off) > 12) {
+        fail(
+          `${where} [${theme}]`,
+          `canvas background is rgb(${ink.bg}) but the page is ${pageBg}`
+        );
+      }
+    }
+    if (errors.length) fail(`${where} [${theme}]`, `console error: ${errors[0]}`);
+    await ctx.close();
+  }
+
+  // And it belongs to districts only: a municipality's silhouette without the
+  // coast around it is a fragment.
+  const ctx = await browser.newContext({ viewport: { width: 1180, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/albufeira_faro`, {
+    waitUntil: 'networkidle',
+    timeout: 45000,
+  });
+  await page.waitForTimeout(800);
+  if ((await page.locator('.dart').count()) !== 0) {
+    fail(where, 'a municipality page carries a district portrait');
+  }
+  await ctx.close();
+}
+
 const { srv, root } = serve();
 await new Promise((r) => setTimeout(r, 1200));
 
@@ -655,6 +755,7 @@ try {
   await checkPolicyMarks(browser);
   await checkLanguages(browser);
   await checkCombinedTimeline(browser);
+  await checkDistrictArt(browser);
 } catch (e) {
   fail('harness', String(e).slice(0, 300));
 } finally {
@@ -669,5 +770,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `verify ok — ${ROUTES.length + PT_ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas, the policy marks, both languages and the combined timeline`
+  `verify ok — ${ROUTES.length + PT_ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas, the policy marks, both languages, the combined timeline and the district art`
 );
