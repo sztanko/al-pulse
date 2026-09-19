@@ -39,10 +39,16 @@ models:
 
 seeds:
   al_pulse:
-    +column_types: # event_date,event_name,description
+    +column_types: # event_date,event_name,description(,_pt)
       event_date: date
       event_name: text
       description: text
+      # The site is bilingual; the law is Portuguese, so the Portuguese wording
+      # is the original and the English is the translation. Both live here
+      # rather than in the site's dictionary because they are data about the
+      # world, not labels on a control.
+      event_name_pt: text
+      description_pt: text
 
 vars:
   # The Azores are excluded from every time series because their register is a

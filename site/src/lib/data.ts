@@ -129,6 +129,11 @@ export interface EventRow {
   event_date: string;
   event_name: string;
   description: string | null;
+  /** Portuguese wording. Optional so that an event added to the seed without a
+   * translation still renders — in English, visibly untranslated, rather than
+   * blank. */
+  event_name_pt?: string | null;
+  description_pt?: string | null;
 }
 
 export interface Shard {

@@ -15,11 +15,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { type Map as MLMap, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { fmt } from '../lib/format';
+import { t, type Key, type Lang } from '../lib/i18n';
 import './Choropleth.css';
 
 type Metric = 'rank_within_country' | 'al_count' | 'people_per_al';
 
 interface Props {
+  lang: Lang;
   geoUrl: string;
   base: string;
   steps?: number;
@@ -44,11 +47,11 @@ interface Hovered {
  * near-black -> bright apricot. Both run subtle -> strong, so the legend is
  * written in those terms and the ends say which is which. */
 const METRICS: {
-  key: Metric; label: string; hint: string; invert: boolean;
-  lo: string; hi: string; scale: 'quantile' | 'log';
+  key: Metric; label: Key; hint: Key; invert: boolean;
+  lo: Key; hi: Key; scale: 'quantile' | 'log';
   /** Shown beside the ramp when some localities have no value for this metric,
    * so the no-data shade is named rather than left to be guessed. */
-  missing?: string;
+  missing?: Key;
 }[] = [
   {
     // Rank is uniform by construction — 1..2471 with one locality at each — so
@@ -56,22 +59,22 @@ const METRICS: {
     // lands in a single shade. Ranks 1 and 275 were the same colour. Log bins
     // give the head of the distribution, which is the part anyone is looking
     // at, its own colours.
-    key: 'rank_within_country', label: 'Rank by ALs', invert: true,
+    key: 'rank_within_country', label: 'map.metric_rank', invert: true,
     scale: 'log',
-    hint: 'stronger colour = higher up the national ranking',
-    lo: 'lowest ranked', hi: 'rank 1',
-    missing: 'not ranked (Azores)',
+    hint: 'map.hint_rank',
+    lo: 'map.lo_rank', hi: 'map.hi_rank',
+    missing: 'map.missing_rank',
   },
   {
-    key: 'al_count', label: 'Number of ALs', invert: false, scale: 'quantile',
-    hint: 'stronger colour = more registrations',
-    lo: 'fewest', hi: 'most',
+    key: 'al_count', label: 'map.metric_count', invert: false, scale: 'quantile',
+    hint: 'map.hint_count',
+    lo: 'map.lo_count', hi: 'map.hi_count',
   },
   {
-    key: 'people_per_al', label: 'Residents per AL', invert: true, scale: 'quantile',
-    hint: 'stronger colour = denser (fewer residents per registration)',
-    lo: 'least dense', hi: 'densest',
-    missing: 'no population figure',
+    key: 'people_per_al', label: 'map.metric_ppa', invert: true, scale: 'quantile',
+    hint: 'map.hint_ppa',
+    lo: 'map.lo_ppa', hi: 'map.hi_ppa',
+    missing: 'map.missing_pop',
   },
 ];
 
@@ -89,7 +92,7 @@ const FILL = 'localities-fill';
 const LINE = 'localities-line';
 const HOVER = 'localities-hover';
 
-const n0 = (v: number | null) => (v == null ? '—' : Math.round(v).toLocaleString('en-GB'));
+
 
 const isDark = () => {
   const attr = document.documentElement.getAttribute('data-theme');
@@ -117,7 +120,8 @@ const rampVars = (steps: number): string[] => {
   );
 };
 
-export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
+export default function Choropleth({ lang, geoUrl, base, steps = 9 }: Props) {
+  const n0 = fmt(lang).num0;
   const holderRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MLMap | null>(null);
   const hoverIdRef = useRef<number | string | null>(null);
@@ -431,7 +435,7 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
   return (
     <div className="ch">
       <div className="ch-controls">
-        <div className="ch-metrics" role="group" aria-label="Colour the map by">
+        <div className="ch-metrics" role="group" aria-label={t(lang, 'map.colour_by')}>
           {METRICS.map((mm) => (
             <button
               key={mm.key}
@@ -440,31 +444,31 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
               aria-pressed={metric === mm.key}
               onClick={() => setMetric(mm.key)}
             >
-              {mm.label}
+              {t(lang, mm.label)}
             </button>
           ))}
         </div>
-        <div className="ch-zoom" role="group" aria-label="Jump to">
-          <button type="button" onClick={() => flyTo(MAINLAND)}>Mainland</button>
-          <button type="button" onClick={() => flyTo(MADEIRA)}>Madeira</button>
-          <button type="button" onClick={() => flyTo(AZORES)}>Azores</button>
+        <div className="ch-zoom" role="group" aria-label={t(lang, 'map.jump_to')}>
+          <button type="button" onClick={() => flyTo(MAINLAND)}>{t(lang, 'map.mainland')}</button>
+          <button type="button" onClick={() => flyTo(MADEIRA)}>{t(lang, 'map.madeira')}</button>
+          <button type="button" onClick={() => flyTo(AZORES)}>{t(lang, 'map.azores')}</button>
         </div>
       </div>
 
       <div className="ch-legend">
-        <span className="small faint">{hint}</span>
+        <span className="small faint">{t(lang, hint)}</span>
         <span className="ch-scale">
-          <span className="small faint">{active.lo}</span>
+          <span className="small faint">{t(lang, active.lo)}</span>
           <span className="ch-ramp" aria-hidden="true">
             {Array.from({ length: steps }, (_, i) => (
               <i key={i} style={{ background: `var(--m-seq-${i + 1})` }} />
             ))}
           </span>
-          <span className="small faint">{active.hi}</span>
+          <span className="small faint">{t(lang, active.hi)}</span>
         </span>
         {active.missing && (
           <span className="ch-nodata small faint">
-            <i aria-hidden="true" /> {active.missing}
+            <i aria-hidden="true" /> {t(lang, active.missing)}
           </span>
         )}
       </div>
@@ -474,16 +478,16 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
           ref={holderRef}
           className="ch-map"
           role="application"
-          aria-label="Map of Portuguese localities by registered short-lets"
+          aria-label={t(lang, 'map.aria')}
         />
 
         {err && (
           <p className="ch-loading muted">
-            The map could not load ({err}). Every locality is still listed on the{' '}
-            <a href={`${base}/areas`}>areas index</a>.
+            {t(lang, 'map.failed', { err: err ?? '' })}{' '}
+            <a href={`${base}/areas`}>{t(lang, 'map.failed_link')}</a>.
           </p>
         )}
-        {!ready && !err && <p className="ch-loading muted">Loading the map…</p>}
+        {!ready && !err && <p className="ch-loading muted">{t(lang, 'map.loading')}</p>}
 
         {hovered && (
           <div
@@ -498,17 +502,30 @@ export default function Choropleth({ geoUrl, base, steps = 9 }: Props) {
             <div className="ch-readout-name">{hovered.name}</div>
             <div className="ch-readout-sub small faint">{hovered.full}</div>
             <dl>
-              <div><dt>Registered ALs</dt><dd className="num">{n0(hovered.al)}</dd></div>
               <div>
-                <dt>Rank in Portugal</dt>
+                <dt>{t(lang, 'map.registered')}</dt>
+                <dd className="num">{n0(hovered.al)}</dd>
+              </div>
+              <div>
+                <dt>{t(lang, 'map.rank_in_pt')}</dt>
                 <dd className={hovered.ranked ? 'num' : 'num faint'}>
-                  {hovered.ranked ? n0(hovered.rank) : 'not ranked'}
+                  {hovered.ranked ? n0(hovered.rank) : t(lang, 'map.not_ranked')}
                 </dd>
               </div>
-              <div><dt>Residents per AL</dt><dd className="num">{n0(hovered.ppa)}</dd></div>
-              <div><dt>Population</dt><dd className="num">{n0(hovered.pop)}</dd></div>
+              <div>
+                <dt>{t(lang, 'map.residents')}</dt>
+                <dd className="num">{n0(hovered.ppa)}</dd>
+              </div>
+              <div>
+                <dt>{t(lang, 'map.population')}</dt>
+                <dd className="num">{n0(hovered.pop)}</dd>
+              </div>
             </dl>
-            {hovered.slug && <a href={`${base}/areas/${hovered.slug}`}>Open {hovered.name} →</a>}
+            {hovered.slug && (
+              <a href={`${base}/areas/${hovered.slug}`}>
+                {t(lang, 'map.open', { name: hovered.name })}
+              </a>
+            )}
           </div>
         )}
       </div>

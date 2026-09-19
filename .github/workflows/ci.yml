@@ -74,10 +74,18 @@ jobs:
         run: |
           set -euo pipefail
           PAGES=$(find site/dist/areas -name index.html | wc -l)
-          echo "area pages: $PAGES"
+          PT_PAGES=$(find site/dist/pt/areas -name index.html | wc -l)
+          echo "area pages: $PAGES english, $PT_PAGES portuguese"
           test "$PAGES" -ge 2700 || { echo "only $PAGES area pages built"; exit 1; }
+          # The two trees must match exactly. A language that quietly builds
+          # fewer pages than the other is a routing bug that no screenshot and
+          # no smoke test would show.
+          test "$PT_PAGES" -eq "$PAGES" || {
+            echo "language trees disagree: $PAGES vs $PT_PAGES"; exit 1; }
           for p in site/dist/index.html site/dist/map/index.html \
                    site/dist/method/index.html site/dist/areas/index.html \
+                   site/dist/pt/index.html site/dist/pt/map/index.html \
+                   site/dist/pt/method/index.html site/dist/pt/areas/index.html \
                    site/dist/geo/localities.json; do
             test -s "$p" || { echo "missing or empty: $p"; exit 1; }
           done

@@ -11,6 +11,8 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { timeTicks } from '../lib/ticks';
+import { fmt } from '../lib/format';
+import { t, type Lang } from '../lib/i18n';
 import './GrowthExplorer.css';
 
 export interface SeriesIn {
@@ -20,6 +22,7 @@ export interface SeriesIn {
 }
 
 export interface Props {
+  lang: Lang;
   months: string[];
   hierarchy: SeriesIn[];
   subareas: SeriesIn[];
@@ -37,20 +40,11 @@ const MARK_GAP = 17;
 const MARK_STEP = 16;
 
 const PAD = { top: 14, right: 16, bottom: 26, left: 48 };
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CATS = ['--m-cat-1','--m-cat-2','--m-cat-3','--m-cat-4','--m-cat-5','--m-cat-6','--m-cat-7','--m-cat-8'];
 
-const label = (m: string): string => {
-  const [y, mm] = m.split('-');
-  return `${MONTHS[Number(mm) - 1] ?? mm} ${y}`;
-};
-const longLabel = (m: string): string => {
-  const [y, mm] = m.split('-');
-  const full = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  return `${full[Number(mm) - 1] ?? mm} ${y}`;
-};
 
 export default function GrowthExplorer({
+  lang,
   months,
   hierarchy,
   subareas,
@@ -60,6 +54,10 @@ export default function GrowthExplorer({
   defaultBack = 36,
   height = 320,
 }: Props) {
+  const f = fmt(lang);
+  const label = f.monthShort;
+  const longLabel = f.monthLabel;
+
   const n = months.length;
   const maxB = Math.min(maxBack, n - 1);
   const [back, setBack] = useState(Math.min(defaultBack, maxB));
@@ -141,7 +139,7 @@ export default function GrowthExplorer({
     return out;
   }, [lo, hi]);
 
-  const xTicks = useMemo(() => timeTicks(months, 0, n - 1, narrow ? 5 : 9), [months, n, narrow]);
+  const xTicks = useMemo(() => timeTicks(lang, months, 0, n - 1, narrow ? 5 : 9), [months, n, narrow]);
 
   /* Marks that would overlap are stacked downward instead of drawn on top of
    * each other. Four of the six changes to the law fall inside fourteen months
@@ -199,7 +197,7 @@ export default function GrowthExplorer({
     <div className="ge" ref={wrapRef}>
       <div className="ge-controls">
         <label className="ge-slider-label" htmlFor={sliderId}>
-          Compare growth since
+          {t(lang, 'growth.since')}
           <strong> {longLabel(baseMonth)}</strong>
         </label>
         {/* The control's value is the base month's index on the axis, not the
@@ -217,7 +215,7 @@ export default function GrowthExplorer({
           step={1}
           value={baseIdx}
           onChange={(e) => setBack(n - 1 - Number(e.currentTarget.value))}
-          aria-label="Base month for the growth comparison"
+          aria-label={t(lang, 'growth.slider_label')}
           aria-valuetext={longLabel(baseMonth)}
         />
         <div className="ge-slider-ends small faint">
@@ -227,14 +225,14 @@ export default function GrowthExplorer({
       </div>
 
       {hasSub && (
-        <div className="ge-tabs" role="tablist" aria-label="Growth comparison">
+        <div className="ge-tabs" role="tablist" aria-label={t(lang, 'growth.tabs')}>
           <button
             role="tab"
             aria-selected={tab === 'area'}
             className={tab === 'area' ? 'is-on' : ''}
             onClick={() => setTab('area')}
           >
-            This area in context
+            {t(lang, 'growth.tab_context')}
           </button>
           <button
             role="tab"
@@ -242,7 +240,7 @@ export default function GrowthExplorer({
             className={tab === 'subareas' ? 'is-on' : ''}
             onClick={() => setTab('subareas')}
           >
-            Its {subareas.length} subareas
+            {t(lang, 'growth.tab_subareas', { n: f.num0(subareas.length) })}
           </button>
         </div>
       )}
@@ -262,7 +260,10 @@ export default function GrowthExplorer({
         height={height}
         viewBox={`0 0 ${w} ${height}`}
         role="img"
-        aria-label={`Growth of ${drawn.length} areas since ${longLabel(baseMonth)}, where 100% is that month`}
+        aria-label={t(lang, 'growth.aria', {
+          n: f.num0(drawn.length),
+          month: longLabel(baseMonth),
+        })}
         tabIndex={0}
         onPointerMove={(e) => {
           if (pinned && e.pointerType === 'touch') return;
@@ -296,7 +297,7 @@ export default function GrowthExplorer({
             <g key={k} transform={`translate(0,${y(v).toFixed(2)})`}>
               <line className="ge-grid" x1={0} x2={innerW} />
               <text className="ge-axis" x={-8} y={3} textAnchor="end">
-                {(v * 100).toFixed(0)}%
+                {f.num0(v * 100)}%
               </text>
             </g>
           ))}
@@ -384,7 +385,7 @@ export default function GrowthExplorer({
               <div className="ge-readout-row" key={s.name}>
                 <i style={{ background: `var(${CATS[k % CATS.length]})` }} />
                 <span>{s.name}</span>
-                <b className="num">{((v ?? 0) * 100).toFixed(1)}%</b>
+                <b className="num">{f.pct1(v ?? 0)}</b>
               </div>
             ))}
         </div>

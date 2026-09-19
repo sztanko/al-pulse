@@ -4,9 +4,11 @@
  * The change carries a neutral band (see format.delta) so a rounding-scale
  * move is rendered "no change" rather than as a coloured direction.
  */
-import { delta, rankDelta, type Direction } from '../lib/format';
+import { fmt, type Direction } from '../lib/format';
+import type { Lang } from '../lib/i18n';
 
 interface Props {
+  lang: Lang;
   title: string;
   value: string;
   /** Raw change; pass either this or `rank`. */
@@ -19,11 +21,12 @@ interface Props {
   context?: string;
 }
 
-const { title, value, change, rank, changeLabel, note, context } = Astro.props;
+const { lang, title, value, change, rank, changeLabel, note, context } = Astro.props;
+const f = fmt(lang);
 
 let d: { text: string; dir: Direction } | null = null;
-if (rank !== undefined && rank !== null) d = rankDelta(rank);
-else if (change !== undefined && change !== null) d = delta(change);
+if (rank !== undefined && rank !== null) d = f.rankDelta(rank);
+else if (change !== undefined && change !== null) d = f.delta(change);
 ---
 
 <div class="metric">

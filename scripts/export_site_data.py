@@ -212,7 +212,8 @@ def fetch_events(con: duckdb.DuckDBPyConnection) -> list[dict]:
     """Policy events annotated onto the timelines. '#'-prefixed ones are hidden."""
     return rows_as_dicts(con, """
         SELECT strftime(event_date, '%Y-%m') AS month,
-               event_date, event_name, description
+               event_date, event_name, description,
+               event_name_pt, description_pt
         FROM events
         WHERE event_name NOT LIKE '#%'
         ORDER BY event_date
