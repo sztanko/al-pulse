@@ -23,6 +23,26 @@ CREATE TABLE IF NOT EXISTS al_raw_data AS
 SELECT * FROM read_csv_auto('$AL_DATA/*.csv.gz', header=True, union_by_name=true);
 " "$DUCKDB_LOCATION"
 
+# The Azorean regional register. Separate source, separate table: it has no
+# registration dates, so it must never reach region_stats, and keeping it in its
+# own table makes that structural rather than a rule someone has to remember.
+#
+# The filename carries the pull timestamp because the CSV itself has no date
+# column to carry it. stg_azores_al.sql uses it to pick the newest snapshot.
+duckdb -c "
+CREATE TABLE IF NOT EXISTS azores_al_raw_data AS
+SELECT
+    *,
+    filename AS source_file,
+    strptime(
+        regexp_extract(filename, 'azores_al_([0-9]{8}_[0-9]{6})', 1),
+        '%Y%m%d_%H%M%S'
+    ) AS etl_timestamp
+FROM read_csv_auto(
+    '$AZORES_DATA/azores_al_*.csv.gz', header=True, union_by_name=true, filename=true
+);
+" "$DUCKDB_LOCATION"
+
 duckdb -c "
 CREATE TABLE IF NOT EXISTS postal_codes_raw AS
 SELECT * FROM read_csv_auto('$POSTAL_CODE_DATA/postal_codes_raw.csv.gz', header=True)

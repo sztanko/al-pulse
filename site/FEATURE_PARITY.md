@@ -206,3 +206,55 @@ And one thing found while checking the above, unrelated to the rewrite:
   heading with nothing beneath it. The exporter now takes the country
   distribution directly (it is one distribution repeated per area), and the
   verifier asserts both pages actually draw bars.
+
+
+## Added after parity — the Azores
+
+Not an Evidence feature, so not a parity item; it is new ground and the
+contract should say what was decided and why.
+
+The Evidence site, and this one until now, excluded the Azores on the grounds
+that "their AL register is not maintained". That was wrong. The national
+register is maintained for the Azores — it just holds 321 establishments where
+the archipelago has 4,494, because tourism is a regional competence and Azorean
+operators register with the Direção Regional do Turismo. The Azores are now
+read from that regional register.
+
+**What they have:** counts, population-derived measures, room mix, an area page
+each, and polygons on the map. 171 new area pages, and the map goes from 2,471
+localities to 2,622.
+
+**What they do not have, and why:** the regional register records no dates.
+Not stale dates, no date column. Everything on the site that means *compared
+with the same thing at another time* therefore cannot exist for them:
+
+| Figure | Azores | Reason |
+|---|---|---|
+| Monthly series | absent | Nothing to plot a month against |
+| Growth over 3 years | `n/a` | Same |
+| Losses | absent | A loss is the difference between two pulls; theirs start now |
+| Rank in Portugal / district / municipality | `n/a` | Every rank is computed inside the monthly series |
+| Rank movement | `n/a` | Same |
+| Concentration (`distribution_skew`) | absent | Built on the series; the site already guarded on it being null |
+
+Three choices inside that are worth defending:
+
+- **No national rank, rather than a snapshot rank.** Ranking Azorean areas
+  against the national set for the current month is easy and was tempting. It
+  would also produce a rank that cannot be compared with the rank *movement*
+  printed beside it, because that movement is measured on a set the Azores were
+  never in. One basis, honestly labelled, beats two that look alike.
+- **The headline total excludes them, and their total sits beside it.** A
+  single number adding a fourteen-year series to a one-month snapshot would
+  disagree with every chart under it.
+- **Their room mix is compared against Açores, not Portugal.** The national bar
+  comes from the national register, which holds 7% of them; comparing an
+  Azorean freguesia against a set it is absent from is worse than not
+  comparing.
+
+Every one of those shows an em dash or `n/a`, never a zero, and every one is
+marked with an asterisk leading to `AzoresNote.astro`, which reads its numbers
+from `meta.azores` so the explanation cannot drift from the data. The invariant
+is enforced by `tests/azores_stay_out_of_the_time_series.sql` rather than by
+convention, and `npm run verify` loads an Azorean page and fails if any chart
+element is present on it.

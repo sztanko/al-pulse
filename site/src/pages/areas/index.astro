@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import AreaTable from '../../components/AreaTable.tsx';
 import Tabs from '../../components/Tabs.astro';
+import AzoresNote from '../../components/AzoresNote.astro';
 import { areasOfType, meta, type AreaRow } from '../../lib/data';
 import { monthLabel } from '../../lib/format';
 
@@ -17,6 +18,7 @@ const toRow = (x: AreaRow) => ({
   rank_within_country: x.rank_within_country,
   al_count_growth_pcnt: x.al_count_growth_pcnt,
   rank_within_country_change: x.rank_within_country_change,
+  in_time_series: x.in_time_series,
 });
 
 const regions = areasOfType('region').map(toRow);
@@ -34,8 +36,11 @@ const localities = areasOfType('locality').map(toRow);
     {m.counts.regions} districts, {m.counts.municipalities} municipalities and
     {' '}{m.counts.localities.toLocaleString('en-GB')} localities, as of
     {' '}{monthLabel(m.data_through)}. One tab per level — search or sort any
-    table; each name opens that area's own page.
+    table; each name opens that area's own page. Azorean areas show a count but
+    no growth or rank<AzoresNote />
   </p>
+
+  <AzoresNote mode="note" />
 
   <Tabs
     id="areas"

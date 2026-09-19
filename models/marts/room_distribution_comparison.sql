@@ -88,6 +88,19 @@ admins AS (
         0 AS osm_id
 ),
 
+-- Every Azorean area, at all three levels. The national side has to exclude
+-- these explicitly: `hierarchies` pairs *every* area with the country row, so
+-- without this an Azorean freguesia would be given a "Portugal" bar drawn from
+-- the national register — the one that holds a few hundred of its ~4,500
+-- establishments. A comparison against a set you are absent from is worse than
+-- no comparison.
+azores_areas AS (
+    SELECT a.osm_id
+    FROM {{ ref('admin') }} AS a
+    INNER JOIN {{ ref('admin') }} AS r
+        ON a.region_slug = r.slug AND r.osm_id = {{ var('azores_region_osm_id') }}
+),
+
 -- Get hierarchy information for each area
 stats_with_hierarchies AS (
     SELECT
@@ -110,8 +123,82 @@ stats_with_hierarchies AS (
     INNER JOIN admins AS a ON r.area_id = a.osm_id
     INNER JOIN hierarchies AS h ON r.area_id = h.area_id -- or (r.area_id = h.group_id and h.admin_type='country')
     INNER JOIN admins AS aa ON h.group_id = aa.osm_id
+    WHERE h.group_id NOT IN (SELECT osm_id FROM azores_areas)
+),
 
+-- The Azorean comparison stops at Açores and does not reach Portugal.
+--
+-- Not an oversight: the national bar is drawn from the national register,
+-- which holds a few hundred Azorean establishments out of ~4,500, so a bar
+-- labelled "Portugal" next to an Azorean freguesia would be comparing it with
+-- a set it is almost entirely absent from. Each register is compared within
+-- itself.
+azores_rooms AS (
+    SELECT
+        s.area_id,
+        s.admin_type,
+        s.full_name AS name,
+        s.area_slug AS slug,
+        m.metric_name,
+        m.room_category,
+        m.value
+    FROM {{ ref('azores_area_stats') }} AS s
+    CROSS JOIN LATERAL (
+        VALUES
+            ('0 rooms', 1, s.rooms_0),
+            ('1 room', 2, s.rooms_1),
+            ('2 rooms', 3, s.rooms_2),
+            ('3 rooms', 4, s.rooms_3),
+            ('More than 3 rooms', 5, s.rooms_more_than_3)
+    ) AS m (metric_name, room_category, value)
+    WHERE s.rooms_known > 0
+),
+
+-- Self, then each ancestor up to the region, for every Azorean area.
+azores_pairs AS (
+    SELECT
+        a.osm_id AS group_id,
+        a.osm_id AS area_id
+    FROM {{ ref('admin') }} AS a
+    UNION ALL
+    SELECT
+        a.osm_id AS group_id,
+        p.osm_id AS area_id
+    FROM {{ ref('admin') }} AS a
+    INNER JOIN {{ ref('admin') }} AS p ON a.parent_id = p.osm_id
+    UNION ALL
+    SELECT
+        a.osm_id AS group_id,
+        pp.osm_id AS area_id
+    FROM {{ ref('admin') }} AS a
+    INNER JOIN {{ ref('admin') }} AS p ON a.parent_id = p.osm_id
+    INNER JOIN {{ ref('admin') }} AS pp ON p.parent_id = pp.osm_id
+),
+
+azores_with_hierarchies AS (
+    SELECT
+        g.slug,
+        ap.group_id,
+        r.metric_name,
+        r.room_category,
+        r.value,
+        r.area_id,
+        r.admin_type,
+        r.name,
+        CASE
+            WHEN r.admin_type = 'locality' THEN 1
+            WHEN r.admin_type = 'municipality' THEN 2
+            WHEN r.admin_type = 'region' THEN 3
+            ELSE 5
+        END AS area_level
+    FROM azores_rooms AS r
+    INNER JOIN azores_pairs AS ap ON r.area_id = ap.area_id
+    INNER JOIN {{ ref('admin') }} AS g ON ap.group_id = g.osm_id
+    -- Only Azorean groups: the pairs CTE spans the whole country.
+    INNER JOIN {{ ref('azores_area_stats') }} AS own ON ap.group_id = own.area_id
 )
 
 SELECT * FROM stats_with_hierarchies
+UNION ALL
+SELECT * FROM azores_with_hierarchies
 ORDER BY group_id, area_level, room_category

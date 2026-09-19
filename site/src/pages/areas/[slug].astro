@@ -6,10 +6,12 @@ import TimeSeries from '../../components/TimeSeries.tsx';
 import GrowthExplorer from '../../components/GrowthExplorer.tsx';
 import SubareaMix from '../../components/SubareaMix.tsx';
 import AreaTable from '../../components/AreaTable.tsx';
+import AzoresNote from '../../components/AzoresNote.astro';
 import Tabs from '../../components/Tabs.astro';
 import {
   areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
-  areaBySlug, observedPeak, lossStartIndex, unobservedIndices, type AreaRow,
+  areaBySlug, observedPeak, lossStartIndex, unobservedIndices, emptySeries,
+  type AreaRow,
 } from '../../lib/data';
 import { num0, pct1, monthLabel } from '../../lib/format';
 
@@ -28,25 +30,35 @@ const last = months.length - 1;
 const isLocality = a.admin_type === 'locality';
 const isRegion = a.admin_type === 'region';
 
-const total = d.series.cum_c[last] ?? 0;
+// The Azores have no monthly series at all — their register records no
+// registration dates. Everything time-derived below is therefore computed only
+// when there is a series to compute it from, and is null otherwise; the page
+// renders an explanation where the charts would be rather than charting zeros.
+const hasSeries = d.in_time_series && d.series != null;
+const S = d.series ?? emptySeries();
+
 const threeBack = Math.max(0, last - 36);
-const totalThen = d.series.cum_c[threeBack] ?? 0;
-const growth3y = totalThen ? total / totalThen - 1 : null;
+// The count itself survives without a series: it is this month's number, which
+// is exactly what a snapshot is.
+const total = hasSeries ? (S.cum_c[last] ?? 0) : (a.al_count ?? 0);
+const totalThen = S.cum_c[threeBack] ?? 0;
+const growth3y = hasSeries && totalThen ? total / totalThen - 1 : null;
 
-const alk = d.series.al_per_1000[last] ?? 0;
-const alkThen = d.series.al_per_1000[threeBack] ?? 0;
-const inhabPerAl = alk ? 1000 / alk : null;
+const alk = S.al_per_1000[last] ?? 0;
+const alkThen = S.al_per_1000[threeBack] ?? 0;
+const inhabPerAl = hasSeries ? (alk ? 1000 / alk : null) : (a.inhabitants_per_al ?? null);
 const inhabThen = alkThen ? 1000 / alkThen : null;
-const inhabChange = inhabPerAl && inhabThen ? inhabPerAl / inhabThen - 1 : null;
+const inhabChange =
+  hasSeries && inhabPerAl && inhabThen ? inhabPerAl / inhabThen - 1 : null;
 
-const rankC = d.series.rank_c[last] ?? null;
-const rankCThen = d.series.rank_c[threeBack] ?? null;
-const rankR = d.series.rank_r[last] ?? null;
-const rankRThen = d.series.rank_r[threeBack] ?? null;
-const rankM = d.series.rank_m[last] ?? null;
-const rankMThen = d.series.rank_m[threeBack] ?? null;
+const rankC = hasSeries ? (S.rank_c[last] ?? null) : null;
+const rankCThen = hasSeries ? (S.rank_c[threeBack] ?? null) : null;
+const rankR = hasSeries ? (S.rank_r[last] ?? null) : null;
+const rankRThen = hasSeries ? (S.rank_r[threeBack] ?? null) : null;
+const rankM = hasSeries ? (S.rank_m[last] ?? null) : null;
+const rankMThen = hasSeries ? (S.rank_m[threeBack] ?? null) : null;
 
-const lost = lostSummary(d.series);
+const lost = lostSummary(S);
 const evs = events().map((e) => ({ month: e.month, label: e.event_name }));
 
 // Peer population for the rank context line — a rank only means something
@@ -65,6 +77,7 @@ const toRow = (x: AreaRow) => ({
   rank_within_country: x.rank_within_country,
   al_count_growth_pcnt: x.al_count_growth_pcnt,
   rank_within_country_change: x.rank_within_country_change,
+  in_time_series: x.in_time_series,
 });
 
 const backHref = d.parent ? `${base}/areas/${d.parent.slug}` : `${base}/`;
@@ -72,9 +85,9 @@ const backLabel = d.parent ? d.parent.name : 'Overview';
 
 // Peak over observed months only — between pulls the series is interpolated
 // and its maximum is an artefact of when we looked.
-const pk = observedPeak(d.series.cum_c);
+const pk = observedPeak(S.cum_c);
 const offPeak = pk.value ? total / pk.value - 1 : 0;
-const shrinking = pk.index < last && offPeak < -0.005;
+const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
 ---
 
 <Base
@@ -130,6 +143,15 @@ const shrinking = pk.index < last && offPeak < -0.005;
 
     <section class="metric-group" aria-labelledby="g-rank">
       <h2 class="metric-group-title" id="g-rank">Where it ranks</h2>
+      {/* The tiles stay, empty, rather than the group disappearing. A reader
+          looking for a rank should find the place where a rank would be and be
+          told it does not exist, not find nothing and assume they missed it. */}
+      {!hasSeries && (
+        <p class="small faint rank-na">
+          Not ranked: every rank here is computed inside the monthly series, and
+          this area has none<AzoresNote />
+        </p>
+      )}
       <div class="grid">
         <Metric
           title="In Portugal"
@@ -182,13 +204,27 @@ const shrinking = pk.index < last && offPeak < -0.005;
     }
   </div>
 
+  {!hasSeries && (
+    <>
+      <h2>No history for this area</h2>
+      <p>
+        Everything above is this month's count. There is no chart on this page
+        because there is nothing to plot it against — and that is a fact about
+        the register, not a gap in this site.
+      </p>
+      <AzoresNote mode="note" />
+    </>
+  )}
+
+  {hasSeries && (
+  <>
   <h2>Registrations over time</h2>
   <figure>
     <TimeSeries
       client:load
       months={months}
-      line={d.series.cum_c}
-      bars={d.series.c}
+      line={S.cum_c}
+      bars={S.c}
       lineLabel="Total registered"
       barLabel="New that month"
       events={evs}
@@ -214,13 +250,13 @@ const shrinking = pk.index < last && offPeak < -0.005;
     />
   </section>
   {
-    (d.series.cum_lost[last] ?? 0) > 0 ? (
+    (S.cum_lost[last] ?? 0) > 0 ? (
       <figure>
         <TimeSeries
           client:visible
           months={months}
-          line={d.series.cum_lost}
-          bars={d.series.lost}
+          line={S.cum_lost}
+          bars={S.lost}
           lineLabel="Lost, cumulative"
           barLabel="Lost that month"
           events={evs}
@@ -259,8 +295,11 @@ const shrinking = pk.index < last && offPeak < -0.005;
     />
   </figure>
 
+  </>
+  )}
+
   {
-    !isLocality && d.subareas.length > 0 && (
+    hasSeries && !isLocality && d.subareas.length > 0 && (
       <>
         <h2>How the total splits</h2>
         <figure>

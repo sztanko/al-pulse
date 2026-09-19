@@ -69,13 +69,83 @@ const gaps = m.unobserved_months;
     stretch would be an artefact of when we looked.
   </p>
 
+  <h2>Two registers, and why only one has history</h2>
+  <p>
+    Tourism is a regional competence in the autonomous regions. Madeira reports
+    into the national register; the Azores do not. Azorean operators register
+    with the Direção Regional do Turismo and receive a regional number (RRAL),
+    so the national export carries only
+    {' '}{m.azores.in_national_register.toLocaleString('en-GB')} Azorean
+    establishments against the
+    {' '}{m.azores.listings.toLocaleString('en-GB')} on the regional register.
+    This site was previously described as excluding the Azores because their
+    data was not updated. That was the wrong diagnosis — the national register
+    <em>is</em> updated for the Azores, it is simply the wrong register.
+  </p>
+  <p>
+    The regional one is published as open data
+    (<a href="https://dados.gov.pt/datasets/alojamento-local-em-funcionamento-na-regiao-autonoma-dos-acores-raa">
+      Alojamento Local em funcionamento na Região Autónoma dos Açores</a>,
+    CC-BY) and this site reads it directly, so
+    {' '}{m.azores.localities.toLocaleString('en-GB')} Azorean localities and
+    {' '}{m.azores.municipalities} municipalities now have real counts, pages
+    and map polygons.
+  </p>
+  <p>
+    <strong>It records no dates.</strong> There is no registration date column
+    and no opening date column — not stale dates, no dates. Everything on this
+    site that means <em>compared with the same thing at another time</em>
+    therefore cannot exist for the Azores:
+  </p>
+  <ul>
+    <li>no monthly series, so no chart on an Azorean area page;</li>
+    <li>no growth figure over any period;</li>
+    <li>
+      no rank, because every rank here is computed inside the monthly series.
+      Ranking an Azorean area against the national set for the current month
+      would produce a number that could not be compared with the rank movement
+      printed beside it, so the rank is shown as absent instead;
+    </li>
+    <li>
+      and no losses: a lapsed licence is only visible by comparing two pulls,
+      and the Azorean pulls start now.
+    </li>
+  </ul>
+  <p>
+    All of those read <span class="num">—</span> or <span class="num">n/a</span>
+    rather than zero. Zero is a measurement; this is an absence. Each monthly
+    pull is kept, so an Azorean series will accumulate from
+    {' '}{monthLabel(m.data_through)} forward — it just cannot be back-filled.
+  </p>
+  <p>
+    One consequence worth naming: the national headline figure on the overview
+    page excludes the Azores, and the Azorean total is shown beside it rather
+    than added into it. A single number mixing a fourteen-year series with a
+    one-month snapshot would disagree with every chart underneath it.
+  </p>
+
+  <h3>How Azorean records are placed on the map</h3>
+  <p>
+    The regional register gives each establishment a concelho, a freguesia and
+    a coordinate. The names do not match OpenStreetMap's: they disagree about
+    the freguesia for 47% of records, mostly over parenthetical qualifiers and
+    saints' names, so matching on names alone would place barely half of them.
+    Each record is therefore located by its coordinate, against the same
+    freguesia polygons the rest of the site uses —
+    {' '}99.4% land inside one. The remainder fall back to name matching and
+    then to the concelho alone; a record that resolves to no area is counted
+    nowhere and reported. Where a coordinate lands on a different island from
+    the one the register states, the coordinate is rejected rather than
+    believed.
+  </p>
+  <p>
+    The published register also carries the operator's name, e-mail and phone
+    number in every row. Those columns are dropped before anything is written
+    to disk, and a test fails the build if they reappear.
+  </p>
+
   <h2>What is excluded</h2>
   <ul>
-    <li>
-      <strong>The Azores.</strong> Their register is not maintained to the same
-      cadence, so all {m.counts.areas.toLocaleString('en-GB')} areas here are
-      mainland Portugal and Madeira. An Azorean locality has no page.
-    </li>
     <li>
       <strong>Areas the geography cannot place.</strong> A registration whose
       postcode resolves to no known locality is counted nationally but appears

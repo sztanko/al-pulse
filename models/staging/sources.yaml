@@ -8,6 +8,13 @@ sources:
       - name: al_raw_data
         description: |
           Contains raw data on AL
+      - name: azores_al_raw_data
+        description: |
+          The Azorean regional AL register (RRAL), already cleansed by
+          scripts/fetch_azores.py. Loaded by run_etl.sh from the glob of
+          monthly pulls in downloads/azores, with the pull timestamp parsed
+          from each filename. Carries no registration dates - see
+          models/staging/stg_azores_al.sql.
       - name: postal_codes_raw
         description: |
           Contains raw data on postcodes

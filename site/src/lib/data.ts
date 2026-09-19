@@ -38,6 +38,20 @@ export interface Meta {
     municipalities: number;
     localities: number;
   };
+  /** The Azores, which are counted but never charted — see `in_time_series`.
+   * Every number the footnote quotes comes from here rather than from prose,
+   * so the explanation cannot drift from the data it explains. */
+  azores: {
+    /** Establishments in the regional register. */
+    listings: number;
+    areas: number;
+    municipalities: number;
+    localities: number;
+    /** The same archipelago as the *national* register has it. The gap between
+     * this and `listings` is the entire reason the Azores need their own
+     * source. */
+    in_national_register: number;
+  };
 }
 
 /** One entry per area: identity, hierarchy and the headline measures. */
@@ -48,6 +62,11 @@ export interface AreaRow {
   full_name: string;
   admin_type: AdminType;
   population: number | null;
+  /** False for Azorean areas. Their register records no registration dates, so
+   * there is no month-by-month anything for them: no series, no growth, no
+   * rank, no rank movement. Anything time-derived must be shown as absent and
+   * explained, never as zero and never computed from a different basis. */
+  in_time_series: boolean;
   parent_id: number | null;
   parent_name: string | null;
   parent_path: string | null;
@@ -121,7 +140,9 @@ export interface Shard {
   population: number | null;
   parent: { slug: string; name: string } | null;
   parent_path: string | null;
-  series: Series;
+  in_time_series: boolean;
+  /** Null exactly when `in_time_series` is false. */
+  series: Series | null;
   hierarchy: NamedSeries[];
   subareas: NamedSeries[];
   skew: Skew | null;
@@ -143,9 +164,12 @@ export interface MapRow {
   slug: string;
   population: number | null;
   al_count: number | null;
-  rank_within_country: number | null;
+  /** Omitted, not null, when the locality is unranked — the exporter drops
+   * empty metrics so the map's fill expression can test `["has", key]`. */
+  rank_within_country?: number | null;
   people_per_al: number | null;
-  people_per_al_rank: number | null;
+  people_per_al_rank?: number | null;
+  has_time_series?: boolean;
 }
 
 let _meta: Meta | null = null;
@@ -221,6 +245,29 @@ export const unobservedIndices = (): number[] => {
  * register is only ever seen on pull months, so between two pulls the series
  * is an interpolation and its local maximum means nothing.
  */
+/** A series of the right shape with nothing in it.
+ *
+ * Only for areas where `in_time_series` is false. It exists so the page's
+ * frontmatter can compute without a null check on every line, *not* so that
+ * anything gets drawn: a chart of this would be a flat zero line, which is a
+ * claim that nothing was ever registered there. The page must branch on
+ * `in_time_series` before it renders, and this never reaches a component.
+ */
+export function emptySeries(): Series {
+  const n = meta().months.length;
+  const blank = () => Array.from({ length: n }, () => 0);
+  return {
+    c: blank(),
+    cum_c: blank(),
+    lost: blank(),
+    cum_lost: blank(),
+    rank_c: blank(),
+    rank_r: blank(),
+    rank_m: blank(),
+    al_per_1000: blank(),
+  };
+}
+
 export function observedPeak(cum: number[]): { value: number; month: string; index: number } {
   const ms = meta().months;
   const obs = new Set(meta().observed_months);

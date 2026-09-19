@@ -18,6 +18,11 @@ export interface Row {
   rank_within_country: number | null;
   al_count_growth_pcnt: number | null;
   rank_within_country_change: number | null;
+  /** Defaults to true. False for Azorean areas, whose register records no
+   * dates: growth, rank and rank movement do not exist for them, and the
+   * difference between "did not change" and "cannot be computed" is the whole
+   * point of marking them. */
+  in_time_series?: boolean;
 }
 
 export interface Props {
@@ -28,7 +33,10 @@ export interface Props {
   initial?: number;
 }
 
-type Key = keyof Omit<Row, 'slug'>;
+// Sortable columns only. `in_time_series` is a property of the row, not a
+// column in it, and leaving it in the key type makes the comparator try to
+// subtract booleans.
+type Key = keyof Omit<Row, 'slug' | 'in_time_series'>;
 
 const COLUMNS: { key: Key; label: string; kind: 'text' | 'bar' | 'delta' | 'rankdelta' | 'scale' }[] =
   [
@@ -55,6 +63,13 @@ function rankText(v: number | null): { t: string; d: string } {
   const p = Math.abs(Math.round(v));
   return v < 0 ? { t: `↑ ${p}`, d: 'up' } : { t: `↓ ${p}`, d: 'down' };
 }
+
+/** What a cell says when the figure cannot exist rather than being unknown.
+ *
+ * `rankText(null)` says "no change", which for an area with no history would
+ * be a claim about a year that was never measured. These cells say so instead,
+ * and the footnote under the table says why. */
+const NOT_APPLICABLE = 'n/a';
 
 export default function AreaTable({ rows, base, caption, initial = 25 }: Props) {
   const [sort, setSort] = useState<{ key: Key; dir: 1 | -1 }>({
@@ -149,13 +164,16 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
           </thead>
           <tbody>
             {shown.map((r) => {
-              const g = deltaText(r.al_count_growth_pcnt);
-              const rc = rankText(r.rank_within_country_change);
+              const timed = r.in_time_series !== false;
+              const g = timed ? deltaText(r.al_count_growth_pcnt) : { t: NOT_APPLICABLE, d: 'na' };
+              const rc = timed
+                ? rankText(r.rank_within_country_change)
+                : { t: NOT_APPLICABLE, d: 'na' };
               const alScale = scales.get('al_count') ?? 1;
               const rkScale = scales.get('rank_within_country') ?? 1;
               const ipaScale = scales.get('inhabitants_per_al') ?? 1;
               return (
-                <tr key={r.slug}>
+                <tr key={r.slug} className={timed ? undefined : 'is-untimed'}>
                   <td className="col-text">
                     <a href={`${base}/areas/${r.slug}`}>{r.name}</a>
                   </td>
@@ -175,10 +193,21 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
                     </span>
                   </td>
                   <td className="col-num">
-                    <span className="cell-bar is-rank">
-                      <i style={{ width: `${(1 - (r.rank_within_country ?? 0) / rkScale) * 100}%` }} />
-                      <b className="num">{n0(r.rank_within_country)}</b>
-                    </span>
+                    {timed ? (
+                      <span className="cell-bar is-rank">
+                        <i
+                          style={{
+                            width: `${(1 - (r.rank_within_country ?? 0) / rkScale) * 100}%`,
+                          }}
+                        />
+                        <b className="num">{n0(r.rank_within_country)}</b>
+                      </span>
+                    ) : (
+                      // No bar at all, not a zero-length one: an empty bar in a
+                      // column of bars reads as "lowest", and this area is not
+                      // last, it is not in the ranking.
+                      <span className="num dir-na">{NOT_APPLICABLE}</span>
+                    )}
                   </td>
                   <td className={`col-num dir-${rc.d}`}>
                     <span className="num">{rc.t}</span>
@@ -189,6 +218,15 @@ export default function AreaTable({ rows, base, caption, initial = 25 }: Props) 
           </tbody>
         </table>
       </div>
+
+      {rows.some((r) => r.in_time_series === false) && (
+        <p className="at-note small faint">
+          <span aria-hidden="true">n/a</span> — the Azores keep a separate
+          register that records no registration dates, so growth and rank
+          cannot be computed for those areas. Their AL counts are current and
+          real.
+        </p>
+      )}
 
       {filtered.length > initial && (
         <button type="button" className="at-more" onClick={() => setAll((v) => !v)}>

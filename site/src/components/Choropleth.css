@@ -121,3 +121,32 @@
   align-items: center;
   gap: 0.4rem;
 }
+
+/* Legend key for the no-data shade. The swatch has to change with the theme
+   the same way the map's does, so both are defined from the same two values —
+   see `noDataColor` in Choropleth.tsx. */
+.ch-nodata {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ch-nodata i {
+  width: 1.1rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  border: 1px solid var(--s-rule-strong);
+  background: #e6e6e9;
+}
+/* The dark value has to be guarded by the media query as well as by the
+   attribute. `:root:not([data-theme='light'])` is true in "Auto" mode whatever
+   the system is set to, so on its own it painted the swatch dark on a light
+   page while the map's own no-data fill stayed pale — the legend key did not
+   match the thing it was a key for. */
+:root[data-theme='dark'] .ch-nodata i {
+  background: #2b2f36;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ch-nodata i {
+    background: #2b2f36;
+  }
+}

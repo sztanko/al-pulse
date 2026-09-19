@@ -1,0 +1,274 @@
+{
+  "fetched": 4495,
+  "written": 4494,
+  "dropped": 0,
+  "by_rule": {
+    "dropped-field:proprietar": 4495,
+    "dropped-field:email": 4487,
+    "dropped-field:telemovel": 4288,
+    "dropped-field:telefone": 755,
+    "fixed:tidy_text": 521,
+    "fixed:tipo_canonical": 246,
+    "dropped-field:site": 88,
+    "nulled:coords_lon_equals_lat": 9,
+    "nulled:coords_unparseable": 9,
+    "fixed:duplicate_collapsed": 1,
+    "fixed:island_fuzzy": 1,
+    "flagged:rral_reused": 1,
+    "nulled:number_out_of_range": 1
+  },
+  "examples": [
+    {
+      "key": "2681.0",
+      "field": "tipo",
+      "rule": "tipo_canonical",
+      "before": "E. Hospedagem",
+      "after": "Estabelecimento de hospedagem",
+      "severity": "fixed"
+    },
+    {
+      "key": "5743.0",
+      "field": "concelho",
+      "rule": "tidy_text",
+      "before": "Angra do Heroísmo ",
+      "after": "Angra do Heroísmo",
+      "severity": "fixed"
+    },
+    {
+      "key": "5743.0",
+      "field": "freguesia",
+      "rule": "tidy_text",
+      "before": "Altares ",
+      "after": "Altares",
+      "severity": "fixed"
+    },
+    {
+      "key": "5743.0",
+      "field": "ilha",
+      "rule": "tidy_text",
+      "before": "Terceira ",
+      "after": "Terceira",
+      "severity": "fixed"
+    },
+    {
+      "key": "5743.0",
+      "field": "tipo",
+      "rule": "tidy_text",
+      "before": "Quartos ",
+      "after": "Quartos",
+      "severity": "fixed"
+    },
+    {
+      "key": "5792.0",
+      "field": "concelho",
+      "rule": "tidy_text",
+      "before": "Angra do Heroísmo ",
+      "after": "Angra do Heroísmo",
+      "severity": "fixed"
+    },
+    {
+      "key": "5792.0",
+      "field": "freguesia",
+      "rule": "tidy_text",
+      "before": "Terra Chã ",
+      "after": "Terra Chã",
+      "severity": "fixed"
+    },
+    {
+      "key": "4078.0",
+      "field": "tipo",
+      "rule": "tipo_canonical",
+      "before": "E. Hospedagem",
+      "after": "Estabelecimento de hospedagem",
+      "severity": "fixed"
+    },
+    {
+      "key": "1823.0",
+      "field": "tipo",
+      "rule": "tipo_canonical",
+      "before": "E. Hospedagem",
+      "after": "Estabelecimento de hospedagem",
+      "severity": "fixed"
+    },
+    {
+      "key": "234.0",
+      "field": "tipo",
+      "rule": "tipo_canonical",
+      "before": "E. Hospedagem",
+      "after": "Estabelecimento de hospedagem",
+      "severity": "fixed"
+    },
+    {
+      "key": "5404.0",
+      "field": "tipo",
+      "rule": "tipo_canonical",
+      "before": "E. Hospedagem",
+      "after": "Estabelecimento de hospedagem",
+      "severity": "fixed"
+    },
+    {
+      "key": "5757.0",
+      "field": "coordinates",
+      "rule": "coords_lon_equals_lat",
+      "before": "38.515000994878136,38.515000994878136",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "2453.0",
+      "field": "tipo",
+      "rule": "tipo_canonical",
+      "before": "E. Hospedagem",
+      "after": "Estabelecimento de hospedagem",
+      "severity": "fixed"
+    },
+    {
+      "key": "5798.0",
+      "field": "coordinates",
+      "rule": "coords_unparseable",
+      "before": "",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5793.0",
+      "field": "coordinates",
+      "rule": "coords_unparseable",
+      "before": "",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5765.0",
+      "field": "coordinates",
+      "rule": "coords_lon_equals_lat",
+      "before": "37.74154290964067,37.74154290964067",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5770.0",
+      "field": "coordinates",
+      "rule": "coords_lon_equals_lat",
+      "before": "37.73912449463797,37.73912449463797",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5783.0",
+      "field": "coordinates",
+      "rule": "coords_unparseable",
+      "before": "",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5769.0",
+      "field": "coordinates",
+      "rule": "coords_lon_equals_lat",
+      "before": "37.72206733107351,37.72206733107351",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5799.0",
+      "field": "coordinates",
+      "rule": "coords_unparseable",
+      "before": "",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5524.0",
+      "field": "ilha",
+      "rule": "island_fuzzy",
+      "before": "São Miugel",
+      "after": "São Miguel (0.85)",
+      "severity": "fixed"
+    },
+    {
+      "key": "5766.0",
+      "field": "coordinates",
+      "rule": "coords_lon_equals_lat",
+      "before": "37.74800256444414,37.74800256444414",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5797.0",
+      "field": "coordinates",
+      "rule": "coords_unparseable",
+      "before": "",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5761.0",
+      "field": "coordinates",
+      "rule": "coords_lon_equals_lat",
+      "before": "37.74809051186528,37.74809051186528",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "200.0",
+      "field": "coordinates",
+      "rule": "coords_unparseable",
+      "before": "",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5752.0",
+      "field": "ua",
+      "rule": "number_out_of_range",
+      "before": "5752.0",
+      "after": "",
+      "severity": "nulled"
+    },
+    {
+      "key": "5765",
+      "field": "rral",
+      "rule": "rral_reused",
+      "before": "Casa Capas / Epic Island",
+      "after": "kept all of them",
+      "severity": "flagged"
+    },
+    {
+      "key": "5537",
+      "field": "rral",
+      "rule": "duplicate_collapsed",
+      "before": "AZORES PEDRA APARTMENTS I",
+      "after": "AZORES PEDRA APARTMENTS I",
+      "severity": "fixed"
+    }
+  ],
+  "fetched_at": "20260919_071921",
+  "gates": [
+    {
+      "name": "row_count",
+      "ok": true,
+      "detail": "4494 rows (expected at least 3000)"
+    },
+    {
+      "name": "has_concelho",
+      "ok": true,
+      "detail": "4488/4494 rows carry a concelho"
+    },
+    {
+      "name": "has_coordinates",
+      "ok": true,
+      "detail": "4476/4494 rows carry usable coordinates"
+    },
+    {
+      "name": "drop_rate",
+      "ok": true,
+      "detail": "0 rows dropped (0.0%)"
+    },
+    {
+      "name": "island_coverage",
+      "ok": true,
+      "detail": "9 of 9 islands present"
+    }
+  ]
+}

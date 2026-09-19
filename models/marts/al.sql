@@ -54,5 +54,7 @@ full_mapping AS (
 
 SELECT * FROM full_mapping
 WHERE
-    region_osm_id != 1629146 -- exclude Azores
+    -- The Azores keep their own register (see models/marts/azores_al.sql);
+    -- this one is national and carries only a fraction of them.
+    region_osm_id != {{ var('azores_region_osm_id') }}
     AND region_osm_id IS NOT null

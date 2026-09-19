@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import Choropleth from '../components/Choropleth.tsx';
 import { meta } from '../lib/data';
 import { monthLabel } from '../lib/format';
+import AzoresNote from '../components/AzoresNote.astro';
 
 const m = meta();
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -16,8 +17,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   <h1>Where the short-lets are</h1>
   <p class="lede">
     All {m.counts.localities.toLocaleString('en-GB')} localities with a registered
-    Alojamento Local, as of {monthLabel(m.data_through)}. Drag to pan, scroll or
-    use the buttons to zoom, and hover or tap any locality to open it.
+    Alojamento Local, as of {monthLabel(m.data_through)} — including the
+    {' '}{m.azores.localities} Azorean ones, which come from a separate register
+    and carry a count but no rank<AzoresNote />. Drag to pan, scroll or use the
+    buttons to zoom, and hover or tap any locality to open it.
   </p>
 
   {/* client:only — MapLibre touches `window` at import, so it must never be
@@ -25,12 +28,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   <Choropleth client:only="react" geoUrl={`${base}/geo/localities.json`} base={base} />
 
   <p class="small faint" style="margin-top:0.8rem">
-    Colour bins are quantiles, so each shade holds the same number of
-    localities — that keeps the ramp readable when a handful of places dwarf
-    everywhere else. Basemap by
+    Colour bins are quantiles for counts and residents, so each shade holds the
+    same number of localities — that keeps the ramp readable when a handful of
+    places dwarf everywhere else. Rank is uniform by construction, so it uses
+    geometric bins instead; quantiles would put the whole top of the table in
+    one shade. Basemap by
     <a href="https://openfreemap.org">OpenFreeMap</a> from
     <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> data:
     vector tiles served without an API key, and the only page on this site that
     loads a map library.
   </p>
+  <AzoresNote mode="note" />
 </Base>

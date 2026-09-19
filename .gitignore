@@ -5,8 +5,16 @@ logs/
 .venv
 node_modules/
 downloads/al/*.csv
+# The untouched Azorean pull, kept for provenance and for --from-raw. It
+# still holds the operator's name, e-mail and phone number; only the
+# cleansed CSV beside it is committed.
+downloads/azores/raw/
 downloads/osm/admin.geojson
 data/prod.duckdb
+# DuckDB's spill directory and WAL, created by the PRAGMA in
+# dbt_project.yml. Build scratch, never source.
+data/duckdb_tmp/
+data/*.wal
 __pycache__
 *.osm.pbf
 .DS_Store

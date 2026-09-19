@@ -50,6 +50,9 @@ echo ""
 # Step 3: Add files to git
 echo "Step 3/4: Adding files to git..."
 git add downloads/al/*.csv.gz
+# The Azorean pull, and its cleansing report. The raw pull beside them is
+# gitignored: it still holds the operator's name, e-mail and phone number.
+git add downloads/azores/*.csv.gz downloads/azores/*.report.json
 git add downloads/postal_code/
 
 # Check if there are changes to commit

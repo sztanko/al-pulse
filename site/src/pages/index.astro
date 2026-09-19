@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Metric from '../components/Metric.astro';
 import RoomMix from '../components/RoomMix.astro';
+import AzoresNote from '../components/AzoresNote.astro';
 import TimeSeries from '../components/TimeSeries.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import {
@@ -44,6 +45,7 @@ const regionRows = regions.map((r) => ({
   rank_within_country: r.rank_within_country,
   al_count_growth_pcnt: r.al_count_growth_pcnt,
   rank_within_country_change: r.rank_within_country_change,
+  in_time_series: r.in_time_series,
 }));
 
 const title = 'Portugal Alojamento Local — the short-let register, month by month';
@@ -81,6 +83,17 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
           value={num0(total)}
           change={growth3y}
           changeLabel="over three years"
+          note="Mainland Portugal and Madeira, on the national register."
+        />
+        {/* Shown as its own figure rather than folded into the total. Adding
+            them would produce a number with two different meanings in it — one
+            half a monthly series running to 2012, the other half a snapshot
+            taken this month — and every chart on the page would then disagree
+            with the headline above it. */}
+        <Metric
+          title="Azores, separate register"
+          value={num0(m.azores.listings)}
+          note={`${m.azores.municipalities} municipalities and ${m.azores.localities} localities. Counted here and on the map; absent from every chart.`}
         />
       </div>
     </section>
@@ -109,7 +122,7 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
             <Metric
               title="Localities holding half the ALs"
               value={pct1(c.skew.locality_rank_pcnt)}
-              note={`${c.skew.locality_rank} of ${m.counts.localities.toLocaleString('en-GB')} localities hold 50% of every registration`}
+              note={`${c.skew.locality_rank} of ${(m.counts.localities - m.azores.localities).toLocaleString('en-GB')} localities hold 50% of every registration on the national register`}
             />
             <Metric
               title="Population living there"
@@ -122,10 +135,12 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
     }
   </div>
 
+  <AzoresNote mode="note" />
+
   <h2>Registrations, and what stopped them</h2>
   <p>
     The line is the running total; the bars are registrations added each month.
-    Dashed rules mark the policy changes.
+    Dashed rules mark the policy changes. Mainland Portugal and Madeira only<AzoresNote />
   </p>
   <figure>
     <TimeSeries
@@ -181,6 +196,10 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
   </figure>
 
   <h2>Districts and autonomous regions</h2>
+  <p class="small faint">
+    The Azores are listed with their current count; their growth and rank
+    columns are empty because their register carries no dates<AzoresNote />
+  </p>
   <figure>
     <AreaTable
       client:visible
@@ -201,7 +220,7 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
         <h2>What size are they?</h2>
         <RoomMix
           rows={c.rooms}
-          caption="Share of registrations by number of rooms, nationally."
+          caption="Share of registrations by number of rooms, on the national register. The Azores are shown separately, on their own pages."
         />
       </>
     )

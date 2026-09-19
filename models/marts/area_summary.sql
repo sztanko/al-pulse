@@ -1,5 +1,16 @@
 -- Area summary statistics for both home page and detail pages
 -- Provides statistics for areas and their descendants (children and grandchildren)
+--
+-- Two sources, one shape. Mainland Portugal and Madeira come from region_stats,
+-- the monthly time series built on registration dates. The Azores come from
+-- azores_area_stats, a current-snapshot model, because their register is a
+-- separate regional one that records no dates at all.
+--
+-- `has_time_series` is the difference, carried explicitly rather than inferred
+-- from a null. The exporter passes it through and the site refuses to draw a
+-- chart, a growth figure or a rank for an area where it is false: those all
+-- mean "compared with the same thing at another time", and for these areas
+-- there is no other time to compare with.
 WITH area_hierarchy AS (
     SELECT
         a.osm_id,
@@ -57,27 +68,59 @@ prev_year AS (
         rank_within_country AS rank_prev_year
     FROM regional_monthly
     WHERE month_date = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '3 year'
+),
+
+national AS (
+    SELECT
+        l.direct_parent_slug,
+        l.ancestor_municipality_slug,
+        l.ancestor_region_slug,
+        l.area_url,
+        l.area_name,
+        l.area_slug,
+        l.admin_type,
+        l.al_count,
+        l.inhabitants_per_al,
+        l.al_per_1000,
+        l.rank_within_country,
+        (l.al_count - p.al_count_prev_year) / NULLIF(p.al_count_prev_year, 0) AS al_count_growth_pcnt,
+        (p.rank_prev_year - l.rank_within_country) AS rank_within_country_change,
+        TRUE AS has_time_series
+    FROM latest AS l
+    LEFT JOIN prev_year AS p ON (
+        l.area_slug = p.area_slug AND
+        COALESCE(l.direct_parent_slug, '') = COALESCE(p.direct_parent_slug, '') AND
+        COALESCE(l.ancestor_municipality_slug, '') = COALESCE(p.ancestor_municipality_slug, '') AND
+        COALESCE(l.ancestor_region_slug, '') = COALESCE(p.ancestor_region_slug, '')
+    )
+),
+
+-- Ranks, growth and rank movement are all NULL here, and none of them is a
+-- gap waiting to be filled. Every one is derived from the time series, and an
+-- Azorean area ranked against the national set today would not be comparable
+-- with the rank change sitting next to it. The site shows an em dash and
+-- explains why rather than showing a number from a different basis.
+azores AS (
+    SELECT
+        h.direct_parent_slug,
+        h.ancestor_municipality_slug,
+        h.ancestor_region_slug,
+        '/areas/' || a.area_slug AS area_url,
+        a.area_name,
+        a.area_slug,
+        a.admin_type,
+        a.al_count,
+        a.inhabitants_per_al,
+        a.al_per_1000,
+        CAST(NULL AS BIGINT) AS rank_within_country,
+        CAST(NULL AS DOUBLE) AS al_count_growth_pcnt,
+        CAST(NULL AS BIGINT) AS rank_within_country_change,
+        FALSE AS has_time_series
+    FROM {{ ref('azores_area_stats') }} AS a
+    INNER JOIN area_hierarchy AS h ON a.area_id = h.osm_id
 )
 
-SELECT
-    l.direct_parent_slug,
-    l.ancestor_municipality_slug,
-    l.ancestor_region_slug,
-    l.area_url,
-    l.area_name,
-    l.area_slug,
-    l.admin_type,
-    l.al_count,
-    l.inhabitants_per_al,
-    l.al_per_1000,
-    l.rank_within_country,
-    (l.al_count - p.al_count_prev_year) / NULLIF(p.al_count_prev_year, 0) AS al_count_growth_pcnt,
-    (p.rank_prev_year - l.rank_within_country) AS rank_within_country_change
-FROM latest AS l
-LEFT JOIN prev_year AS p ON (
-    l.area_slug = p.area_slug AND
-    COALESCE(l.direct_parent_slug, '') = COALESCE(p.direct_parent_slug, '') AND
-    COALESCE(l.ancestor_municipality_slug, '') = COALESCE(p.ancestor_municipality_slug, '') AND
-    COALESCE(l.ancestor_region_slug, '') = COALESCE(p.ancestor_region_slug, '')
-)
-ORDER BY l.ancestor_region_slug, l.ancestor_municipality_slug, l.area_name
+SELECT * FROM national
+UNION ALL
+SELECT * FROM azores
+ORDER BY ancestor_region_slug, ancestor_municipality_slug, area_name
