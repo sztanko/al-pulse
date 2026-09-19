@@ -73,6 +73,7 @@ const evs2 = events();
 const evs = evs2.map((e) => ({
   month: e.month,
   label: (lang === 'pt' && e.event_name_pt) || e.event_name,
+  description: (lang === 'pt' && e.description_pt) || e.description,
 }));
 
 // Peer population for the rank context line — a rank only means something
@@ -257,10 +258,16 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
       bars={S.c}
       lineLabel={t(lang, 'chart.total')}
       barLabel={t(lang, 'chart.new_month')}
+      negBars={S.lost}
+      negBarLabel={t(lang, 'chart.lost_month_neg')}
+      negStartIndex={lossStartIndex()}
+      negUnobserved={unobservedIndices()}
       events={evs}
-      height={300}
+      height={400}
     />
-    <figcaption>{t(lang, 'area.cap_over_time')}</figcaption>
+    <figcaption>
+      {t(lang, 'area.cap_flow', { from: f.monthLabel(m.loss_observable_from) })}
+    </figcaption>
   </figure>
   <EventKey lang={lang} events={evs2} />
 
@@ -282,27 +289,11 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
       })}
     />
   </section>
+  {/* No chart of its own any more — the losses are the downward half of the
+      timeline above. What is left here is the pair of totals, and the note for
+      an area that has not been seen to lose anything at all. */}
   {
-    (S.cum_lost[last] ?? 0) > 0 ? (
-      <figure>
-        <TimeSeries
-          client:visible
-          lang={lang}
-          months={months}
-          line={S.cum_lost}
-          bars={S.lost}
-          lineLabel={t(lang, 'chart.lost_cum')}
-          barLabel={t(lang, 'chart.lost_month')}
-          events={evs}
-          height={260}
-          startIndex={lossStartIndex()}
-          unobserved={unobservedIndices()}
-        />
-        <figcaption>
-          {t(lang, 'area.cap_losses', { from: f.monthLabel(m.loss_observable_from) })}
-        </figcaption>
-      </figure>
-    ) : (
+    (S.cum_lost[last] ?? 0) === 0 && (
       <p class="muted small">
         {t(lang, 'area.no_losses', { from: f.monthLabel(m.loss_observable_from) })}
       </p>

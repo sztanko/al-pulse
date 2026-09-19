@@ -435,10 +435,20 @@ async function checkPolicyMarks(browser) {
     if (keyed < boxes.length) {
       fail(`${where} [${vp.name}]`, `${boxes.length} marks drawn but only ${keyed} explained`);
     }
-    // And the key must carry the prose, not just the name.
+
+    // The key starts collapsed and must open. Collapsed is the point — six
+    // paragraphs of legislative history between the chart and the next section
+    // pushed the page below the fold — but a disclosure that will not disclose
+    // is worse than no disclosure.
+    const details = page.locator('details.evk').first();
+    if (await details.evaluate((e) => e.open)) {
+      fail(`${where} [${vp.name}]`, 'the key is open by default');
+    }
+    await details.locator('summary').click();
+    await page.waitForTimeout(150);
     const text = await page.locator('.evk-list').first().innerText();
     if (!/Mais Habita/i.test(text) || text.length < 300) {
-      fail(`${where} [${vp.name}]`, 'the key does not carry the descriptions');
+      fail(`${where} [${vp.name}]`, 'opening the key does not reveal the descriptions');
     }
 
     await ctx.close();
@@ -545,6 +555,86 @@ async function checkLanguages(browser) {
   await ctx.close();
 }
 
+/** The combined timeline: one figure carrying both directions of the flow.
+ *
+ * Three things to hold, each of which has been wrong at some point in this
+ * chart's life: the downward bars must exist and must stay inside the drawing;
+ * the two directions must share a scale, since separate scales would make a
+ * small outflow look like a large one; and hovering a policy mark must give
+ * its description without the month readout fighting it for the same corner.
+ */
+async function checkCombinedTimeline(browser) {
+  const where = 'combined timeline';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`http://127.0.0.1:${PORT}${BASE}/`, {
+    waitUntil: 'networkidle',
+    timeout: 45000,
+  });
+  await page.locator('svg.ts-svg').first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+
+  // There should now be exactly one timeline on the overview, not two.
+  const charts = await page.locator('svg.ts-svg').count();
+  if (charts !== 1) fail(where, `${charts} timelines on the overview; expected 1`);
+
+  const geom = await page.evaluate(() => {
+    const svg = document.querySelector('svg.ts-svg');
+    if (!svg) return null;
+    const h = Number(svg.getAttribute('viewBox').split(' ')[3]);
+    const rects = (sel) =>
+      [...svg.querySelectorAll(sel)].map((r) => ({
+        y: Number(r.getAttribute('y')),
+        h: Number(r.getAttribute('height')),
+      }));
+    return { h, pos: rects('.ts-bar'), neg: rects('.ts-bar-neg') };
+  });
+  if (!geom) {
+    fail(where, 'no timeline found');
+    await ctx.close();
+    return;
+  }
+  if (geom.neg.length === 0) fail(where, 'no downward bars drawn');
+
+  // Nothing may leave the drawing. The inner group is translated down by the
+  // top padding, so compare against the viewBox height with that added.
+  const PAD_TOP = 14;
+  const worst = Math.max(...[...geom.pos, ...geom.neg].map((r) => r.y + r.h)) + PAD_TOP;
+  if (worst > geom.h + 0.5) {
+    fail(where, `bars overflow the chart: reach ${worst.toFixed(1)} of ${geom.h}`);
+  }
+
+  // Hovering a mark must produce its description, and must not leave two
+  // readouts on screen at once.
+  const hit = page.locator('.ts-event-hit').nth(3);
+  const bb = await hit.boundingBox();
+  if (!bb) {
+    fail(where, 'no policy mark to hover');
+  } else {
+    await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    await page.waitForTimeout(300);
+    const ev = page.locator('.ts-readout.is-event');
+    if ((await ev.count()) !== 1) {
+      fail(where, 'hovering a policy mark shows no description');
+    } else {
+      const txt = await ev.innerText();
+      if (txt.length < 60) fail(where, `the mark readout is only "${txt}"`);
+    }
+    if ((await page.locator('.ts-readout:not(.is-event)').count()) !== 0) {
+      fail(where, 'the month readout is still up while a mark is hovered');
+    }
+
+    // And moving off must hand back to the month readout.
+    await page.mouse.move(bb.x - 220, bb.y + 60);
+    await page.waitForTimeout(300);
+    if ((await page.locator('.ts-readout.is-event').count()) !== 0) {
+      fail(where, 'the mark description is stuck after moving away');
+    }
+  }
+
+  await ctx.close();
+}
+
 const { srv, root } = serve();
 await new Promise((r) => setTimeout(r, 1200));
 
@@ -564,6 +654,7 @@ try {
   await checkUntimedArea(browser);
   await checkPolicyMarks(browser);
   await checkLanguages(browser);
+  await checkCombinedTimeline(browser);
 } catch (e) {
   fail('harness', String(e).slice(0, 300));
 } finally {
@@ -578,5 +669,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `verify ok — ${ROUTES.length + PT_ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas, the policy marks and both languages`
+  `verify ok — ${ROUTES.length + PT_ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas, the policy marks, both languages and the combined timeline`
 );

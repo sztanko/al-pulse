@@ -15,6 +15,13 @@
  *
  * The numbering is the array index, so it must be the same `events` array the
  * chart is given, in the same order. Both come from `events()`.
+ *
+ * Collapsed by default. The descriptions now also appear on the marks
+ * themselves when hovered, so this is the reference copy rather than the
+ * primary one — and six paragraphs of legislative history sitting between the
+ * chart and whatever came next pushed the rest of the page below the fold. It
+ * stays a `<details>` rather than a hover-only tooltip because hover is not
+ * available to every reader, and this is the path that always works.
  */
 import type { EventRow } from '../lib/data';
 import { fmt } from '../lib/format';
@@ -41,7 +48,7 @@ const shown = fromMonth ? numbered.filter((e) => e.month >= fromMonth) : numbere
 
 {
   shown.length > 0 && (
-    <details class="evk" open>
+    <details class="evk">
       <summary>
         {heading} — {
           shown.length === 1

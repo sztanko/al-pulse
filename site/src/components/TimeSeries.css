@@ -30,6 +30,35 @@
   fill: var(--m-primary-soft);
 }
 
+/* The outflow. Red because it is a loss, and because the two directions must
+   not be told apart by position alone — a reader scanning quickly reads colour
+   before they read which side of a line something sits on. */
+.ts-bar-neg {
+  fill: var(--m-negative);
+  fill-opacity: 0.75;
+}
+
+.ts-zero {
+  stroke: var(--s-ink-faint);
+  stroke-width: 1;
+}
+
+.ts-axis-right text {
+  fill: var(--s-ink-faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The stretch where the outflow is unknown rather than nil. */
+.ts-nodata rect {
+  fill: var(--s-ink);
+  fill-opacity: 0.035;
+}
+.ts-nodata text {
+  fill: var(--s-ink-faint);
+  font-size: 10px;
+}
+
 .ts-line {
   fill: none;
   stroke: var(--m-primary);
@@ -42,6 +71,23 @@
   stroke: var(--s-rule-strong);
   stroke-width: 1;
   stroke-dasharray: 3 3;
+  /* Not a target. See the note in the component. */
+  pointer-events: none;
+}
+
+/* Pointer target, deliberately larger than the disc it sits under. */
+.ts-event-hit {
+  fill: transparent;
+  cursor: help;
+  /* `visiblePainted`, the SVG default, does not hit-test a fully transparent
+     fill in Chromium, so without this the target is not there at all. */
+  pointer-events: all;
+}
+.ts-event-dot { cursor: help; }
+.ts-event-g.is-on .ts-event { stroke: var(--m-primary); stroke-dasharray: none; }
+.ts-event-g.is-on .ts-event-dot {
+  stroke: var(--m-primary);
+  stroke-width: 2;
 }
 .ts-event-dot {
   fill: var(--s-panel-2);
@@ -119,3 +165,31 @@
 }
 .swatch-line { background: var(--m-primary); }
 .swatch-bar { background: var(--m-primary-soft); }
+
+/* The mark's own readout. Wider than the month readout because it holds a
+   sentence rather than three numbers, and capped so a long one wraps instead
+   of running off the chart. */
+.ts-readout.is-event {
+  max-width: min(24rem, 78vw);
+  white-space: normal;
+}
+.ts-readout-n {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--s-panel-2);
+  border: 1px solid var(--s-rule-strong);
+  font-size: 0.7rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.ts-readout-desc {
+  margin: 0.35rem 0 0;
+  font-weight: 400;
+  color: var(--s-ink-soft);
+  line-height: 1.4;
+}
+.swatch-bar-neg { background: var(--m-negative); }
