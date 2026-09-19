@@ -17,7 +17,7 @@ AL Pulse provides:
 - **Property Analytics**: Analyze room counts, building ages, and property types
 - **Interactive Maps**: Explore geospatial data through the static site visualizations
 
-The project focuses on mainland Portugal and Madeira (Azores data is excluded due to infrequent updates).
+The project covers mainland Portugal and Madeira from the national register (RNAL), and the Azores from the Região Autónoma dos Açores' own register (RRAL) — tourism is a regional competence there, so the national export carries only a few hundred of the ~4,500 Azorean establishments. The regional register records no registration dates, so Azorean areas appear as a current snapshot and are absent from every time series; see `/method` on the site, or `models/marts/azores_al.sql`.
 
 ## Architecture
 

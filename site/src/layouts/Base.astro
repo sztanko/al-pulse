@@ -68,10 +68,12 @@ const href = (p: string) => `${base}${p}`;
       <footer class="footer">
         <p>
           Data through <strong>{m.data_through}</strong> from the Registo Nacional
-          de Turismo. {m.counts.localities.toLocaleString('en-GB')} localities,
+          de Turismo, and for the Azores from the Região Autónoma dos Açores'
+          own register. {m.counts.localities.toLocaleString('en-GB')} localities,
           {' '}{m.counts.municipalities} municipalities,
           {' '}{m.counts.regions} districts and autonomous regions.
-          The Azores are excluded — their AL register is not maintained.
+          The Azorean register records no dates, so those
+          {' '}{m.azores.areas} areas are counted but never charted.
           <a href={href('/method')}>How this is built, and what it cannot tell you</a>.
         </p>
       </footer>

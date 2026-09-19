@@ -9,6 +9,11 @@ WITH admin_type_coverage AS (
         COUNT(al_count_growth_pcnt) as areas_with_growth,
         COUNT(al_count_growth_pcnt) * 100.0 / COUNT(*) as coverage_percent
     FROM {{ ref('area_summary') }}
+    -- Time-series areas only. area_summary also carries the Azores, whose
+    -- register has no dates and so no growth by construction; counting them
+    -- here would dilute the coverage figure until this stopped detecting the
+    -- broken JOIN it exists to detect.
+    WHERE has_time_series
     GROUP BY admin_type
 ),
 

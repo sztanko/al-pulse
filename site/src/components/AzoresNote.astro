@@ -1,0 +1,109 @@
+---
+/** The asterisk, and the thing the asterisk points at.
+ *
+ * Two registers are drawn on this site and only one of them has dates. Every
+ * figure that means "compared with the same thing at another time" — a chart,
+ * a growth percentage, a rank, a rank movement — exists for mainland Portugal
+ * and Madeira and cannot exist for the Azores. Wherever that shows, the number
+ * is marked and the mark leads here.
+ *
+ * `mode="mark"` renders the marker; `mode="note"` renders the explanation.
+ * They share an id so the marker is a real link: on a long page the reader can
+ * jump to the note and back, and a screen reader announces it as a reference
+ * rather than as a stray asterisk.
+ *
+ * The numbers are read from `meta.azores`, never typed. A footnote that
+ * disagrees with the table above it is worse than no footnote.
+ */
+import { meta } from '../lib/data';
+import { num0 } from '../lib/format';
+
+interface Props {
+  mode?: 'mark' | 'note';
+  /** Distinguishes the note on pages that show more than one. */
+  id?: string;
+  /** Extra sentence for the page it sits on. */
+  children?: unknown;
+}
+
+const { mode = 'mark', id = 'azores-note' } = Astro.props;
+const az = meta().azores;
+---
+
+{
+  mode === 'mark' ? (
+    <a
+      class="fn-mark"
+      href={`#${id}`}
+      aria-label="Footnote: why the Azores are not in this figure"
+    >
+      *
+    </a>
+  ) : (
+    <aside class="fn-note" id={id}>
+      <p>
+        <span class="fn-star" aria-hidden="true">
+          *
+        </span>
+        <strong>The Azores are counted, but never charted.</strong> Tourism is a
+        regional competence there, so Azorean operators register with the
+        Direção Regional do Turismo rather than with the national register this
+        site is built on — which holds {num0(az.in_national_register)} Azorean
+        establishments against the {num0(az.listings)} on the regional one.
+        This site reads the regional register directly, so the{' '}
+        {num0(az.localities)} Azorean localities and {num0(az.municipalities)}{' '}
+        municipalities appear in the tables and on the map with their real
+        counts.
+      </p>
+      <p>
+        That register records <strong>no registration dates</strong> — not stale
+        dates, no date column at all. So there is nothing to plot a month
+        against: no growth line, no monthly total, no growth percentage, and no
+        rank, since every rank here is computed within the monthly series. Those
+        are shown as <span class="num">—</span> rather than as zero, because
+        zero would be a claim and this is an absence. Each pull is kept, so a
+        series will accumulate from here forward.
+      </p>
+      <slot />
+    </aside>
+  )
+}
+
+<style>
+  .fn-mark {
+    color: var(--m-primary);
+    text-decoration: none;
+    font-weight: 700;
+    padding: 0 0.1em;
+    vertical-align: super;
+    font-size: 0.8em;
+    line-height: 0;
+  }
+  .fn-mark:hover { text-decoration: underline; }
+  .fn-mark:focus-visible { outline: 2px solid var(--s-focus); outline-offset: 2px; }
+
+  .fn-note {
+    border-left: 3px solid var(--s-rule-strong);
+    background: var(--s-panel-2);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.85rem 1rem;
+    margin: 1.2rem 0 1.6rem;
+    font-size: 0.88rem;
+    color: var(--s-ink-soft);
+  }
+  .fn-note p { margin: 0 0 0.6rem; }
+  .fn-note p:last-child { margin-bottom: 0; }
+  .fn-note strong { color: var(--s-ink); }
+  .fn-star {
+    color: var(--m-primary);
+    font-weight: 700;
+    margin-right: 0.35rem;
+  }
+
+  /* Jumping to the note should make it obvious which one was meant. */
+  .fn-note:target {
+    border-left-color: var(--m-primary);
+    background: var(--s-panel);
+    box-shadow: 0 0 0 1px var(--s-rule-strong);
+  }
+</style>

@@ -107,7 +107,37 @@ in the DuckDB database. The data is then processed through DBT models to create 
 
 The data we fetch is mostly Alojamento Local (AL) data, which includes information about accommodation listings in Portugal. The data is stored in a DuckDB database and processed through DBT models to create a structured dataset for analysis.
 You can see all the data we receive about it in here: models/staging/stg_al_list.sql
-We exclude Azores from our analysis, as their AL data is not really updated.
+### The Azores come from a second, separate register
+
+The national export (RNAL) carries only ~320 Azorean establishments against the
+~4,500 that exist, because tourism is a regional competence and Azorean
+operators register with the Direção Regional do Turismo instead. The old note
+here said their data "is not really updated" — that was the wrong diagnosis.
+RNAL *is* updated for the Azores; it is simply the wrong register.
+
+`scripts/fetch_azores.py` pulls the regional one from the WMS service behind the
+dados.gov.pt dataset "Alojamento Local em funcionamento na RAA" (CC-BY). Things
+to know before touching it:
+
+- **It has no dates.** No registration date, no opening date. So Azorean data
+  must never reach `region_stats` or anything derived from it: no series, no
+  growth, no ranks, no losses. `area_summary.has_time_series` carries the
+  distinction and `tests/azores_stay_out_of_the_time_series.sql` enforces it.
+  The site marks every affected figure with an asterisk (`AzoresNote.astro`).
+- **GetFeatureInfo returns only what is under the queried pixel.** A single
+  probe looks like a complete pull and is not — it returns the central island
+  group and one row for São Miguel. The fetcher tiles a 2x2 grid and asserts
+  the union is larger than any one tile.
+- **The raw pull holds personal data** (operator name, e-mail, phone). It is
+  gitignored; only the cleansed CSV is committed, and
+  `tests/azores_carries_no_personal_data.sql` fails the build if those columns
+  ever reappear.
+- **Records are placed by coordinate, not by name.** The register's freguesia
+  spellings disagree with OSM for 47% of rows; point-in-polygon against `admin`
+  resolves 99.4%. Name matching is only a fallback. See `models/marts/azores_al.sql`.
+
+`downloads/azores/*.report.json` records what every cleansing rule did to that
+month's pull, and `azores_data_quality` is the same thing as a queryable mart.
 
 
 The project implements a dimensional model for time-series analysis:

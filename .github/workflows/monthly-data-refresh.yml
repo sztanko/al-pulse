@@ -51,6 +51,8 @@ jobs:
         run: |
           # Add new csv.gz files in downloads/al/
           git add downloads/al/*.csv.gz
+          # The Azorean regional register, fetched by the same run.
+          git add downloads/azores/*.csv.gz downloads/azores/*.report.json || true
 
           # Add modified files in downloads/postal_code/
           git add downloads/postal_code/

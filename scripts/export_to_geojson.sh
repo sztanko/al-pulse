@@ -19,7 +19,13 @@ TMP="$table_name.geojson"
 rm -f "$TMP"
 mkdir -p "$OUT_DIR"
 
-duckdb data/prod.duckdb <<EOF
+# -bail, because the duckdb CLI exits 0 after a failed statement in a
+# heredoc. Without it a COPY that errors — GDAL refusing a column type, say —
+# leaves the *previous* localities.json in place, and every check below then
+# passes against last week's map. That happened: a HUGEINT population made the
+# export fail while the script reported success and the site kept serving a
+# file with 151 localities missing from it.
+duckdb -bail data/prod.duckdb <<EOF
 INSTALL spatial;
 LOAD spatial;
 COPY $table_name
@@ -30,6 +36,11 @@ WITH (
     SRS 'EPSG:4326'
 );
 EOF
+
+if [ ! -s "$TMP" ]; then
+  echo "ERROR: the COPY produced no $TMP — see the duckdb output above" >&2
+  exit 1
+fi
 
 # mapshaper lives in site/node_modules. Call its binary directly rather than
 # through npx: an `npx ... || npx ...` fallback previously let this script exit
@@ -53,6 +64,14 @@ fi
 FEATURES=$(grep -o '"type":"Feature"' "$OUT" | wc -l)
 if [ "$FEATURES" -lt 1000 ]; then
   echo "ERROR: $OUT holds only $FEATURES features; expected thousands" >&2
+  exit 1
+fi
+
+# Against the table, not a constant. A fixed floor of 1,000 would not have
+# noticed 2,471 features where the table held 2,622.
+ROWS=$(duckdb -bail -noheader -list data/prod.duckdb "SELECT count(*) FROM $table_name;")
+if [ "$FEATURES" -ne "$ROWS" ]; then
+  echo "ERROR: $OUT holds $FEATURES features but $table_name has $ROWS rows" >&2
   exit 1
 fi
 echo "Wrote $OUT ($(du -h "$OUT" | cut -f1), $FEATURES features)"
