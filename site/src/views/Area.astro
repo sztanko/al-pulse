@@ -8,6 +8,7 @@ import SubareaMix from '../components/SubareaMix.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import AzoresNote from '../components/AzoresNote.astro';
 import EventKey from '../components/EventKey.astro';
+import DistrictArt from '../components/DistrictArt.tsx';
 import Tabs from '../components/Tabs.astro';
 import {
   areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
@@ -30,7 +31,9 @@ const a = areaBySlug(slug)!;
 const d = shard(slug);
 const m = meta();
 const f = fmt(lang);
-const base = langBase(import.meta.env.BASE_URL.replace(/\/$/, ''), lang);
+const plainBase = import.meta.env.BASE_URL.replace(/\/$/, '');
+// Links follow the reader's language; assets do not — /pt/geo/… is not a file.
+const base = langBase(plainBase, lang);
 const months = m.months;
 const last = months.length - 1;
 
@@ -124,6 +127,18 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
   </nav>
 
   <h1>{d.full_name}</h1>
+
+  {/* Only districts. A municipality's silhouette is a fragment without the
+      coastline around it, and a freguesia's is a shape nobody could place. */}
+  {
+    isRegion && (
+      <DistrictArt
+        client:only="react"
+        url={`${plainBase}/geo/districts/${a.slug}.json`}
+        slug={a.slug}
+      />
+    )
+  }
   <p class="lede">
     {
       shrinking
