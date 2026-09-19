@@ -93,10 +93,17 @@
   stroke-width: 1;
   stroke-dasharray: 3 3;
 }
-.ge-event-label {
-  fill: var(--s-ink-faint);
-  font-size: 9.5px;
-  writing-mode: vertical-rl;
+.ge-event-dot {
+  fill: var(--s-panel-2);
+  stroke: var(--s-rule-strong);
+  stroke-width: 1;
+}
+.ge-event-n {
+  fill: var(--s-ink);
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 .ge-line {
   fill: none;

@@ -7,6 +7,7 @@ import GrowthExplorer from '../../components/GrowthExplorer.tsx';
 import SubareaMix from '../../components/SubareaMix.tsx';
 import AreaTable from '../../components/AreaTable.tsx';
 import AzoresNote from '../../components/AzoresNote.astro';
+import EventKey from '../../components/EventKey.astro';
 import Tabs from '../../components/Tabs.astro';
 import {
   areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
@@ -59,7 +60,11 @@ const rankM = hasSeries ? (S.rank_m[last] ?? null) : null;
 const rankMThen = hasSeries ? (S.rank_m[threeBack] ?? null) : null;
 
 const lost = lostSummary(S);
-const evs = events().map((e) => ({ month: e.month, label: e.event_name }));
+const evs2 = events();
+// The island only needs a month and a short label; the key needs the prose.
+// Both are derived from the same array in the same order, which is what keeps
+// mark "3" meaning the same law in the chart and in the key beneath it.
+const evs = evs2.map((e) => ({ month: e.month, label: e.event_name }));
 
 // Peer population for the rank context line — a rank only means something
 // against the size of the set it ranks within.
@@ -232,9 +237,10 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
     />
     <figcaption>
       The line is the running total; bars are registrations added each month.
-      Dashed rules mark national policy changes.
+      The numbered dashed rules mark changes to the national law.
     </figcaption>
   </figure>
+  <EventKey events={evs2} />
 
   <h2>Licences leaving the register</h2>
   <section class="grid" aria-label="Lost licences">
@@ -294,6 +300,7 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
       height={330}
     />
   </figure>
+  <EventKey events={evs2} title="The same marks, on this chart" />
 
   </>
   )}

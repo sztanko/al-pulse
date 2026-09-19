@@ -41,6 +41,11 @@ export interface Props {
   unobserved?: number[];
 }
 
+/** Horizontal room a policy mark needs before the next one has to drop a
+ * row, and how far it drops. The marker is 14px across. */
+const MARK_GAP = 17;
+const MARK_STEP = 16;
+
 const PAD = { top: 14, right: 54, bottom: 26, left: 52 };
 
 const MONTHS = [
@@ -142,13 +147,26 @@ export default function TimeSeries({
     return out;
   }, [lineMax]);
 
-  const eventIdx = useMemo(
-    () =>
-      events
-        .map((e) => ({ i: months2.indexOf(e.month), label: e.label }))
-        .filter((e) => e.i >= 0),
-    [events, months2]
-  );
+  /* Marks that would overlap are stacked downward instead of drawn on top of
+   * each other. Four of the six changes to the law fall inside fourteen months
+   * of each other, which on a 360px axis spanning fourteen years puts them 4 to
+   * 13 pixels apart — the markers are 14 wide, so without this the numbers are
+   * illegible exactly where the interesting legislation is. */
+  const eventIdx = useMemo(() => {
+    const hits = events
+      .map((e, k) => ({ i: months2.indexOf(e.month), label: e.label, n: k + 1, row: 0 }))
+      .filter((e) => e.i >= 0)
+      .sort((a, b) => a.i - b.i);
+    let lastX = -Infinity;
+    let row = 0;
+    for (const h of hits) {
+      const px = x(h.i);
+      row = px - lastX < MARK_GAP ? row + 1 : 0;
+      h.row = row;
+      lastX = px;
+    }
+    return hits;
+  }, [events, months2, x]);
 
   const nearest = useCallback(
     (clientX: number): number | null => {
@@ -246,11 +264,25 @@ export default function TimeSeries({
             </g>
           ))}
 
-          {eventIdx.map((e, k) => (
-            <g key={`ev${k}`} transform={`translate(${x(e.i).toFixed(2)},0)`}>
+          {/* A numbered flag, not a label. Rotated 9.5px text inside the plot
+              was illegible and overlapped the data it annotated; the number is
+              readable at this size and the wording lives in <EventKey> under
+              the chart, where it can be a sentence. `n` is the mark's position
+              in the full event list, so it means the same thing on every chart
+              on the page. The <title> gives a native tooltip and an accessible
+              name without making the text hover-only — the key below is always
+              visible. */}
+          {eventIdx.map((e) => (
+            <g key={`ev${e.n}`} transform={`translate(${x(e.i).toFixed(2)},0)`}>
+              <title>{`${e.n}. ${e.label}`}</title>
               <line className="ts-event" y1={0} y2={innerH} />
-              <text className="ts-event-label" y={10} x={3}>
-                {e.label}
+              <circle className="ts-event-dot" cy={7 + e.row * MARK_STEP} r={7} />
+              <text
+                className="ts-event-n"
+                y={10.5 + e.row * MARK_STEP}
+                textAnchor="middle"
+              >
+                {e.n}
               </text>
             </g>
           ))}

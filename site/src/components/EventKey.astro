@@ -1,0 +1,117 @@
+---
+/** The key to the numbered policy marks on the charts.
+ *
+ * The marks used to carry their own labels, set in 9.5px rotated text standing
+ * up inside the plot. That is unreadable at any size and it collides with the
+ * data it is annotating, so in practice the annotations were decoration: you
+ * could see that *something* happened in 2023 but not what, and the one-line
+ * description of each law — which the pipeline has always carried — was
+ * exported and then never shown anywhere.
+ *
+ * Numbering the marks and putting the text underneath fixes both. The numbers
+ * are legible at 10px where words are not, the key is ordinary prose at
+ * ordinary size, and it is server-rendered, so it costs no JavaScript and is
+ * there for a reader who never hovers anything.
+ *
+ * The numbering is the array index, so it must be the same `events` array the
+ * chart is given, in the same order. Both come from `events()`.
+ */
+import type { EventRow } from '../lib/data';
+import { monthLabel } from '../lib/format';
+
+interface Props {
+  events: EventRow[];
+  /** Set when the chart only draws part of the axis, so the key does not
+   * explain a mark that is not on screen. */
+  fromMonth?: string;
+  title?: string;
+}
+
+const { events, fromMonth, title = 'The dashed marks' } = Astro.props;
+
+// Numbered over the full list, then filtered: a mark keeps the number it has
+// on every other chart on the page, so "3" means the same law throughout.
+const numbered = events.map((e, i) => ({ ...e, n: i + 1 }));
+const shown = fromMonth ? numbered.filter((e) => e.month >= fromMonth) : numbered;
+---
+
+{
+  shown.length > 0 && (
+    <details class="evk" open>
+      <summary>
+        {title} — {shown.length} change{shown.length === 1 ? '' : 's'} to the law
+      </summary>
+      <ol class="evk-list">
+        {shown.map((e) => (
+          <li value={e.n}>
+            <span class="evk-n" aria-hidden="true">
+              {e.n}
+            </span>
+            <div>
+              <strong>{e.event_name}</strong>{' '}
+              <span class="evk-when num">{monthLabel(e.month)}</span>
+              <p>{e.description}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </details>
+  )
+}
+
+<style>
+  .evk {
+    border: 1px solid var(--s-rule);
+    border-radius: var(--radius);
+    background: var(--s-panel);
+    padding: 0.6rem 0.85rem;
+    margin: -0.6rem 0 1.4rem;
+    font-size: 0.86rem;
+  }
+  .evk > summary {
+    cursor: pointer;
+    color: var(--s-ink-soft);
+    font-size: 0.84rem;
+  }
+  .evk > summary:focus-visible {
+    outline: 2px solid var(--s-focus);
+    outline-offset: 2px;
+  }
+  .evk-list {
+    list-style: none;
+    margin: 0.7rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+  }
+  .evk-list li {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr;
+    gap: 0.55rem;
+    align-items: start;
+  }
+  /* Same shape and size as the marker drawn on the chart, so the two read as
+     the same object rather than as a number that happens to match. */
+  .evk-n {
+    display: grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    background: var(--s-panel-2);
+    border: 1px solid var(--s-rule-strong);
+    color: var(--s-ink);
+    font-size: 0.76rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .evk-when {
+    color: var(--s-ink-faint);
+    font-size: 0.8rem;
+  }
+  .evk-list p {
+    margin: 0.15rem 0 0;
+    color: var(--s-ink-soft);
+    line-height: 1.45;
+  }
+</style>

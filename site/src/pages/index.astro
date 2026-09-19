@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import Metric from '../components/Metric.astro';
 import RoomMix from '../components/RoomMix.astro';
 import AzoresNote from '../components/AzoresNote.astro';
+import EventKey from '../components/EventKey.astro';
 import TimeSeries from '../components/TimeSeries.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import {
@@ -140,7 +141,8 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
   <h2>Registrations, and what stopped them</h2>
   <p>
     The line is the running total; the bars are registrations added each month.
-    Dashed rules mark the policy changes. Mainland Portugal and Madeira only<AzoresNote />
+    Numbered dashed rules mark the changes to the law, listed under the chart.
+    Mainland Portugal and Madeira only<AzoresNote />
   </p>
   <figure>
     <TimeSeries
@@ -157,6 +159,7 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
       Hover, tap or focus the chart and use the arrow keys to read any month.
     </figcaption>
   </figure>
+  <EventKey events={c.events} />
 
   <h2>Licences leaving the register</h2>
   <p>
@@ -194,6 +197,7 @@ const title = 'Portugal Alojamento Local — the short-let register, month by mo
       {monthLabel(m.observed_months[0]!)}.
     </figcaption>
   </figure>
+  <EventKey events={c.events} fromMonth={m.loss_observable_from} />
 
   <h2>Districts and autonomous regions</h2>
   <p class="small faint">
