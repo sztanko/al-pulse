@@ -8,7 +8,8 @@ import SubareaMix from '../components/SubareaMix.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import AzoresNote from '../components/AzoresNote.astro';
 import EventKey from '../components/EventKey.astro';
-import DistrictArt from '../components/DistrictArt.tsx';
+import AreaArt from '../components/AreaArt.tsx';
+import AreaArtKey from '../components/AreaArtKey.astro';
 import Tabs from '../components/Tabs.astro';
 import {
   areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
@@ -102,6 +103,22 @@ const backHref = d.parent ? `${base}/areas/${d.parent.slug}` : `${base}/`;
 const backLabel = d.parent ? d.parent.name : t(lang, 'area.back_overview');
 const peerLevel = levelLabel(lang, a.admin_type, true);
 
+// The drawn map. A locality shares its municipality's file — one pool of
+// shapes serves every locality in it, and the focus picks the subject out.
+const artUrl =
+  a.admin_type === 'locality'
+    ? `${plainBase}/geo/art/locality/${a.municipality_slug}.json`
+    : `${plainBase}/geo/art/${a.admin_type}/${a.slug}.json`;
+// What the colours are *of*: an area's children, or its neighbours where it
+// has none.
+const artWhat = (
+  a.admin_type === 'region'
+    ? 'art.of_municipalities'
+    : a.admin_type === 'municipality'
+      ? 'art.of_localities'
+      : 'art.of_neighbours'
+) as Parameters<typeof t>[1];
+
 // Peak over observed months only — between pulls the series is interpolated
 // and its maximum is an artefact of when we looked.
 const pk = observedPeak(S.cum_c);
@@ -128,17 +145,16 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
 
   <h1>{d.full_name}</h1>
 
-  {/* Only districts. A municipality's silhouette is a fragment without the
-      coastline around it, and a freguesia's is a shape nobody could place. */}
-  {
-    isRegion && (
-      <DistrictArt
-        client:only="react"
-        url={`${plainBase}/geo/districts/${a.slug}.json`}
-        slug={a.slug}
-      />
-    )
-  }
+  {/* Every level gets one. A locality on its own is a shape nobody could
+      place, which is what the ring of neighbours is for. */}
+  <AreaArt
+    client:only="react"
+    lang={lang}
+    url={artUrl}
+    focus={a.slug}
+    base={base}
+  />
+  <AreaArtKey lang={lang} what={t(lang, artWhat)} />
   <p class="lede">
     {
       shrinking

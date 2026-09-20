@@ -10,7 +10,7 @@
 #
 #   1. install site dependencies          (provides mapshaper)
 #   2. export locality geometry           -> site/public/geo   (served)
-#   3. export the district drawings       -> site/public/geo   (served)
+#   3. export the area drawings           -> site/public/geo   (served)
 #   4. export the JSON payloads           -> site/data         (build-time only)
 #   5. build                               -> site/dist
 #
@@ -28,8 +28,8 @@ fi
 echo "Exporting locality geometry..."
 ./scripts/export_to_geojson.sh localities_with_data_for_geojson
 
-echo "Exporting district drawings..."
-python scripts/export_district_art.py
+echo "Exporting area drawings..."
+python scripts/export_area_art.py
 
 echo "Exporting site payloads..."
 python scripts/export_site_data.py

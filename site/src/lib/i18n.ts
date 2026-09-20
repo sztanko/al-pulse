@@ -500,6 +500,17 @@ const DICT = {
     en: 'The line is the running total. Bars above zero are registrations added that month; below zero, in red, are licences that left. Losses are only visible between two pulls of the register, so they start at {from}, and the stretch with no pull is left blank rather than drawn as zero.',
     pt: 'A linha é o total acumulado. As barras acima de zero são os registos acrescentados nesse mês; abaixo de zero, a vermelho, as licenças que saíram. As perdas só são visíveis entre duas recolhas do registo, pelo que começam em {from}, e o período sem recolha fica em branco em vez de ser desenhado a zero.',
   }),
+
+  // ------------------------------------------------------- the drawn maps
+  'art.key_low': entry({ en: 'fewer ALs', pt: 'menos AL' }),
+  'art.key_high': entry({
+    en: 'more, against the median of these {what}',
+    pt: 'mais, face à mediana destas {what}',
+  }),
+  'art.of_districts': entry({ en: 'districts', pt: 'distritos' }),
+  'art.of_municipalities': entry({ en: 'municipalities', pt: 'municípios' }),
+  'art.of_localities': entry({ en: 'localities', pt: 'freguesias' }),
+  'art.of_neighbours': entry({ en: 'neighbours', pt: 'vizinhas' }),
 } satisfies Record<string, Record<Lang, string>>;
 
 export type Key = keyof typeof DICT;
