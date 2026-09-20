@@ -622,6 +622,14 @@ async function checkCombinedTimeline(browser) {
   // Re-scroll and re-measure here: everything above ran evaluates and waits,
   // and a coordinate measured before them is a coordinate against a page that
   // may have moved since.
+  //
+  // Wait for the drawing above the chart first. It is a canvas sized in an
+  // effect after mount, and the place names on it fade in after that; until
+  // both have happened the chart is still moving down the page, and a target
+  // measured in the middle of it is a target the pointer misses. This is the
+  // second time this check has been fixed for taking a coordinate too early.
+  await page.waitForSelector('.aart-canvas.is-drawn', { timeout: 25000 }).catch(() => {});
+  await page.waitForTimeout(700);
   await page.locator('svg.ts-svg').first().scrollIntoViewIfNeeded();
   await page.waitForTimeout(250);
   const svg = await page.locator('svg.ts-svg').first().boundingBox();

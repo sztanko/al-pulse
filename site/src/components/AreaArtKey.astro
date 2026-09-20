@@ -12,9 +12,11 @@ interface Props {
   lang: Lang;
   /** What the coloured shapes are, e.g. "municipalities". */
   what: string;
+  /** Set where the drawing contains islands whose spacing has been closed up. */
+  islands?: boolean;
 }
 
-const { lang, what } = Astro.props;
+const { lang, what, islands = false } = Astro.props;
 ---
 
 <p class="aart-key">
@@ -24,3 +26,4 @@ const { lang, what } = Astro.props;
   </i>
   <span>{t(lang, 'art.key_high', { what })}</span>
 </p>
+{islands && <p class="aart-note">{t(lang, 'art.islands_moved')}</p>}

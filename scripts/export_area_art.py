@@ -119,6 +119,154 @@ def viewport(b: tuple[float, float, float, float]) -> tuple[float, float, float,
     return cx - hw / k, cy - hw, cx + hw / k, cy + hw
 
 
+# Rings whose boxes come within this of each other are the same island.
+ISLAND_GAP = 0.15
+# Ocean kept between islands once they are packed, as a share of the mean
+# island size. Enough to read them as separate, not enough to waste the frame.
+ISLAND_GUTTER = 0.14
+# Islands are packed into rows chosen to land near this width-to-height ratio,
+# which is roughly the shape of the column an inset is drawn into.
+ISLAND_ASPECT = 1.4
+
+
+def _box_of(ring) -> tuple[float, float, float, float]:
+    xs = [p[0] for p in ring]
+    ys = [p[1] for p in ring]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def close_the_ocean(ring_sets: list[list]) -> list[list]:
+    """Pack an archipelago's islands together, keeping their sizes and order.
+
+    The Azores span 600 km of Atlantic and are 99% water. Fitted honestly into
+    an inset the size of a postcard, every island is four pixels of outline and
+    the fill has nothing to sit in — which is exactly what the first version
+    drew. Madeira has the same problem more mildly, Porto Santo and the
+    Desertas being most of its bounding box.
+
+    So the water is taken out and the land is not touched: islands keep their
+    true relative sizes and their west-to-east order, only the distances
+    between them shrink. This is the ordinary inset device -- the same one that
+    puts Alaska in a box off San Diego -- and the caption says *arranged*
+    rather than *located* because of it.
+
+    `ring_sets` is a list of ring-lists (one per shape, all sharing a
+    coordinate frame); the return is the same structure, translated. Shapes are
+    never split: a municipality's rings move as one with the island they sit
+    on, which is what keeps a coastline continuous across the boundary between
+    two municipalities of the same island.
+    """
+    rings = [(i, r) for i, rs in enumerate(ring_sets) for r in rs]
+    if len(rings) < 2:
+        return ring_sets
+
+    boxes = [_box_of(r) for _, r in rings]
+    lat0 = sum((b[1] + b[3]) / 2 for b in boxes) / len(boxes)
+    k = math.cos(math.radians(lat0)) or 1.0
+    # Work in projected units so a gap in longitude means the same as a gap in
+    # latitude; convert back on the way out.
+    px = lambda b: (b[0] * k, b[1], b[2] * k, b[3])
+    pboxes = [px(b) for b in boxes]
+
+    parent = list(range(len(rings)))
+
+    def find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for i in range(len(rings)):
+        for j in range(i + 1, len(rings)):
+            a, b = pboxes[i], pboxes[j]
+            near = (
+                a[0] - b[2] <= ISLAND_GAP
+                and b[0] - a[2] <= ISLAND_GAP
+                and a[1] - b[3] <= ISLAND_GAP
+                and b[1] - a[3] <= ISLAND_GAP
+            )
+            if near:
+                union(i, j)
+    # Deliberately *not* also unioning the rings of one shape. The archipelago
+    # outline is a single shape with nine rings in it, so that rule made the
+    # whole of the Azores one island and packed nothing -- which is how the
+    # first attempt came out looking exactly like the version it replaced.
+    # Grouping by proximity alone is also the right answer for the shapes it
+    # was meant to protect: an islet belonging to a municipality on another
+    # island travels with the island it actually sits beside, which is what a
+    # reader would expect to see.
+
+    islands: dict[int, list[int]] = {}
+    for idx in range(len(rings)):
+        islands.setdefault(find(idx), []).append(idx)
+    if len(islands) < 2:
+        return ring_sets
+
+    groups = []
+    for members in islands.values():
+        x0 = min(pboxes[i][0] for i in members)
+        y0 = min(pboxes[i][1] for i in members)
+        x1 = max(pboxes[i][2] for i in members)
+        y1 = max(pboxes[i][3] for i in members)
+        groups.append({"members": members, "box": (x0, y0, x1, y1)})
+    groups.sort(key=lambda g: g["box"][0])
+
+    gutter = ISLAND_GUTTER * (
+        sum(max(g["box"][2] - g["box"][0], g["box"][3] - g["box"][1]) for g in groups)
+        / len(groups)
+    )
+
+    def shelve(limit: float) -> tuple[list[tuple[float, float]], float, float]:
+        """Lay the islands out left to right, wrapping past `limit`."""
+        places: list[tuple[float, float]] = []
+        x = y = 0.0
+        row_h = 0.0
+        width = 0.0
+        for g in groups:
+            w = g["box"][2] - g["box"][0]
+            h = g["box"][3] - g["box"][1]
+            if places and x + w > limit:
+                x = 0.0
+                y += row_h + gutter
+                row_h = 0.0
+            places.append((x, y))
+            x += w + gutter
+            row_h = max(row_h, h)
+            width = max(width, x - gutter)
+        return places, width, y + row_h
+
+    total_w = sum(g["box"][2] - g["box"][0] for g in groups) + gutter * (len(groups) - 1)
+    best = None
+    for rows in range(1, len(groups) + 1):
+        places, w, h = shelve(total_w / rows + 1e-9)
+        if h <= 0 or w <= 0:
+            continue
+        cost = abs(math.log((w / h) / ISLAND_ASPECT))
+        if best is None or cost < best[0]:
+            best = (cost, places)
+    places = best[1]
+
+    # North stays up: a shelf grows downward, so rows are laid out from the
+    # top and the y offset is subtracted.
+    shift = [(0.0, 0.0)] * len(rings)
+    for g, (gx, gy) in zip(groups, places):
+        dx = gx - g["box"][0]
+        dy = -gy - g["box"][3]
+        for i in g["members"]:
+            shift[i] = (dx / k, dy)
+
+    out: list[list] = [[] for _ in ring_sets]
+    for idx, (owner, ring) in enumerate(rings):
+        dx, dy = shift[idx]
+        out[owner].append([(x + dx, y + dy) for x, y in ring])
+    return out
+
+
 def overlaps(a, b) -> bool:
     return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
 
@@ -269,12 +417,30 @@ def main(
         region = regions.get(slug)
         if not region:
             return None
-        packer = Packer(viewport(region["bbox"]))
+        subs = by_parent_m.get(region["osm_id"], [])
+        # The outline and the municipalities are packed in one call, so that
+        # both get the same translation per island -- packed separately they
+        # would drift and the outline would no longer sit on its own coast.
+        moved = close_the_ocean([region["rings"]] + [m["rings"] for m in subs])
+        focus_rings, sub_rings = moved[0], moved[1:]
+        # A label point travels with the shape it labels. It is not on a ring,
+        # so it moves by its own municipality's offset: the difference between
+        # where that shape's first point started and where it is now.
+        moved_subs = []
+        for m, rings in zip(subs, sub_rings):
+            shifted = {**m, "rings": rings}
+            if m.get("label") and m["rings"] and rings:
+                dx = rings[0][0][0] - m["rings"][0][0][0]
+                dy = rings[0][0][1] - m["rings"][0][0][1]
+                shifted["label"] = (m["label"][0] + dx, m["label"][1] + dy)
+            moved_subs.append(shifted)
+
+        packer = Packer(viewport(bbox(focus_rings)))
         return {
             **packer.header(),
             "name": region["name"],
-            "focus": packer.pack(region["rings"]),
-            "subs": [sub_entry(m, packer) for m in by_parent_m.get(region["osm_id"], [])],
+            "focus": packer.pack(focus_rings),
+            "subs": [sub_entry(m, packer) for m in moved_subs],
             "ctx": [],
         }
 
@@ -291,23 +457,31 @@ def main(
         "focus": [ring for r in mainland for ring in cpack.pack(r["rings"])],
         "subs": [sub_entry(r, cpack) for r in mainland],
         "ctx": [],
-        "insets": [g for g in (island_group(MADEIRA_SLUG), island_group(AZORES_SLUG)) if g],
+        # The Azores first, so they are drawn above Madeira: they lie some
+        # 500 km north-west of it, and a column that ran the other way put the
+        # southern archipelago on top of the northern one.
+        "insets": [g for g in (island_group(AZORES_SLUG), island_group(MADEIRA_SLUG)) if g],
     }
     total += write(out_dir / "country.json", country)
     counts["country"] += 1
 
     # ------------------------------------------------------------- regions
     for region in regions.values():
-        packer = Packer(viewport(region["bbox"]))
         # Madeira and the Azores have no neighbours to show, and the check is
         # the general one rather than a name: nothing else is within reach.
-        payload = {
-            **packer.header(),
-            "name": region["name"],
-            "focus": packer.pack(region["rings"]),
-            "subs": [sub_entry(m, packer) for m in by_parent_m.get(region["osm_id"], [])],
-            "ctx": context_for(region, regions, packer),
-        }
+        # They do need the ocean taken out, for the same reason the insets do,
+        # and the country page's insets are built by exactly this call.
+        if region["slug"] in (AZORES_SLUG, MADEIRA_SLUG):
+            payload = {**island_group(region["slug"]), "ctx": []}
+        else:
+            packer = Packer(viewport(region["bbox"]))
+            payload = {
+                **packer.header(),
+                "name": region["name"],
+                "focus": packer.pack(region["rings"]),
+                "subs": [sub_entry(m, packer) for m in by_parent_m.get(region["osm_id"], [])],
+                "ctx": context_for(region, regions, packer),
+            }
         total += write(out_dir / "region" / f"{region['slug']}.json", payload)
         counts["region"] += 1
 

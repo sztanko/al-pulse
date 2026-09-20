@@ -68,6 +68,12 @@ const ZOOM = 1.5;
  * its own proportions long before the cap. Portugal is twice as tall as it is
  * wide, so a low cap made the country map a postage stamp. */
 const MAX_H = 560;
+/* Portugal is twice as tall as it is wide, so the height cap -- not the page
+ * width -- is what decides the size of the country drawing, and at 560 it left
+ * the landing page's own picture occupying under half the column it sits in.
+ * The country page gets a taller cap, and is the only page that needs one:
+ * every area wide enough to be capped by width instead is already unaffected. */
+const MAX_H_INSETS = 680;
 
 type Pt = [number, number];
 
@@ -242,16 +248,23 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
 
       const insets = art.insets ?? [];
       const avail = Math.max(240, Math.min(host.clientWidth, 820));
-      let mainW = avail;
+      const maxH = insets.length ? MAX_H_INSETS : MAX_H;
+      // The islands stack down a column beside the mainland, in the ocean its
+      // own bounding box leaves empty. That column is part of the width the
+      // drawing has to fit into: sizing the mainland to the full width and
+      // then adding a column beside it makes a canvas 1.66x the room there is,
+      // and at 360px the city labels -- positioned in canvas pixels -- hang
+      // off the side of the page and it scrolls sideways.
+      const insetShare = insets.length ? 0.66 : 0;
+      const budget = Math.round(avail / (1 + insetShare));
+      let mainW = budget;
       let cssH = Math.round(mainW / aspect);
-      if (cssH > MAX_H) {
-        cssH = MAX_H;
-        mainW = Math.min(Math.round(MAX_H * aspect), avail);
+      if (cssH > maxH) {
+        cssH = maxH;
+        mainW = Math.min(Math.round(maxH * aspect), budget);
       }
       if (cssH < 200) cssH = 200;
-      // The islands stack down a column beside the mainland, in the ocean its
-      // own bounding box leaves empty.
-      const mainLeft = insets.length ? Math.round(mainW * 0.62) : 0;
+      const mainLeft = Math.round(mainW * insetShare);
       const cssW = mainW + mainLeft;
 
       /* The locality pool is a municipality's worth of shapes plus a margin,
@@ -508,8 +521,13 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
         const icx = (ix0 + ix1) / 2;
         const icy = (iy0 + iy1) / 2;
         const ik = Math.cos((icy * Math.PI) / 180);
-        const ihalf = (Math.max((ix1 - ix0) * ik, iy1 - iy0) * 1.12) / 2;
-        const isc = Math.min((mainLeft * 0.78) / (ihalf * 2 * ik), (ih * 0.7) / (ihalf * 2));
+        // Fitted to the archipelago's own box, not to a square containing it.
+        // Both are about twice as wide as they are tall once the ocean between
+        // the islands is taken out, so a square box threw away half the room
+        // and drew them at half the size they had space for.
+        const iW = (ix1 - ix0) * ik;
+        const iH = iy1 - iy0;
+        const isc = Math.min((mainLeft * 0.88) / (iW * 1.1), (ih * 0.84) / (iH * 1.1));
         const iproj = (p: Pt): Pt => [
           mainLeft / 2 + (p[0] - icx) * ik * isc - cssW / 2,
           iTop + ih / 2 - (p[1] - icy) * isc - cssH / 2,
