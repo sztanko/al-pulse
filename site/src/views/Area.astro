@@ -154,7 +154,11 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
     focus={a.slug}
     base={base}
   />
-  <AreaArtKey lang={lang} what={t(lang, artWhat)} />
+  <AreaArtKey
+    lang={lang}
+    what={t(lang, artWhat)}
+    islands={a.slug === 'acores' || a.slug === 'madeira'}
+  />
   <p class="lede">
     {
       shrinking

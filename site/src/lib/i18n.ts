@@ -511,6 +511,11 @@ const DICT = {
   'art.of_municipalities': entry({ en: 'municipalities', pt: 'municípios' }),
   'art.of_localities': entry({ en: 'localities', pt: 'freguesias' }),
   'art.of_neighbours': entry({ en: 'neighbours', pt: 'vizinhas' }),
+  // Said wherever islands are drawn, because they are not where they are.
+  'art.islands_moved': entry({
+    en: 'Islands are drawn at their true sizes but arranged closer together than they lie; the Atlantic between them would otherwise be most of the picture.',
+    pt: 'As ilhas são desenhadas à escala real, mas dispostas mais próximas do que estão; caso contrário, o Atlântico entre elas ocuparia quase toda a imagem.',
+  }),
 } satisfies Record<string, Record<Lang, string>>;
 
 export type Key = keyof typeof DICT;
