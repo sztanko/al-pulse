@@ -64,6 +64,21 @@ interface ArtFile {
 /** Must match ZOOM in scripts/export_area_art.py — that decides which
  * neighbours are in the file, this decides how much of them is shown. */
 const ZOOM = 1.5;
+/** Used instead where there are no neighbours to leave room for. The margin
+ * ZOOM opens up is there so the ring of context shapes has somewhere to sit;
+ * on the country page and on the two archipelagos nothing is drawn in it, and
+ * for Madeira and the Azores in particular it is 50% more Atlantic around an
+ * outline that is already mostly Atlantic.
+ *
+ * "No neighbours" has to mean no `ctx` *and* no pool. A locality file carries
+ * neither a focus outline nor a ctx list — its neighbours are the pool it
+ * shares with the rest of its municipality — so testing `ctx` alone framed
+ * every locality tight to its own edge and left the canvas 4.9% drawn on. */
+const ZOOM_ALONE = 1.06;
+
+/** A name drawn over the canvas: a town on the map, or an inset's caption
+ * sitting in the top-left of its frame (`box`). */
+type PlaceLabel = { name: string; x: number; y: number; box?: boolean };
 /** Only tall subjects ever reach this — a wide district's height is set by
  * its own proportions long before the cap. Portugal is twice as tall as it is
  * wide, so a low cap made the country map a postage stamp. */
@@ -242,8 +257,10 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
        * tall, so a square viewport fitted to the frame was driven by the
        * width, and the district ended up a quarter of the frame with empty sky
        * above and below it. */
-      const vpW = (maxx - minx) * k * ZOOM;
-      const vpH = (maxy - miny) * ZOOM;
+      const alone = (art.ctx?.length ?? 0) === 0 && (art.areas?.length ?? 0) === 0;
+      const zoom = alone ? ZOOM_ALONE : ZOOM;
+      const vpW = (maxx - minx) * k * zoom;
+      const vpH = (maxy - miny) * zoom;
       const aspect = vpW / Math.max(vpH, 1e-9);
 
       const insets = art.insets ?? [];
@@ -255,7 +272,11 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
       // then adding a column beside it makes a canvas 1.66x the room there is,
       // and at 360px the city labels -- positioned in canvas pixels -- hang
       // off the side of the page and it scrolls sideways.
-      const insetShare = insets.length ? 0.66 : 0;
+      // As wide as the mainland gets. Portugal is a narrow country and the
+      // archipelagos are wide, scattered ones drawn at their true spacing, so
+      // the column beside it is where the islands have any chance of being
+      // legible — and the page has the width to give it.
+      const insetShare = insets.length ? 0.95 : 0;
       const budget = Math.round(avail / (1 + insetShare));
       let mainW = budget;
       let cssH = Math.round(mainW / aspect);
@@ -340,7 +361,11 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
        * so "typical for its neighbours" sits in the pale middle and both ends
        * read. A mean would be dragged by one Lisbon and put almost everything
        * on the same side of the midpoint. */
-      const values = tinted
+      // The insets are part of the same set of districts, so they belong in
+      // the distribution that sets the bands. Leaving them out would have
+      // coloured Madeira and the Azores against a median of the 18 mainland
+      // districts while the key said twenty.
+      const values = [...tinted, ...insets.flatMap((i) => i.subs ?? [])]
         .map((t) => t.count)
         .filter((v): v is number => typeof v === 'number')
         .sort((a, b) => a - b);
@@ -375,6 +400,7 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
       brush.push();
 
       const hits: Hit[] = [];
+      const cityLabels: PlaceLabel[] = [];
       const toScreen = (rings: Pt[][], proj: (p: Pt) => Pt) =>
         rings.map((r) => jitter(r.map(proj)));
 
@@ -486,7 +512,6 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
         }
       };
 
-      const cityLabels: { name: string; x: number; y: number }[] = [];
 
       drawGroup(
         art,
@@ -512,7 +537,13 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
             return pts;
           });
         const ifocus = iRings(inset.focus ?? []);
-        const pts = ifocus.flat();
+        // The extent comes from whatever is actually drawn. On the country
+        // page an archipelago is a single district and carries no separate
+        // focus outline, so measuring `focus` alone found nothing and the
+        // inset was skipped entirely.
+        const pts = ifocus.length
+          ? ifocus.flat()
+          : (inset.subs ?? []).flatMap((sh) => iRings(sh.r ?? []).flat());
         if (!pts.length) return;
         const ix0 = Math.min(...pts.map((p) => p[0]));
         const ix1 = Math.max(...pts.map((p) => p[0]));
@@ -532,6 +563,42 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
           mainLeft / 2 + (p[0] - icx) * ik * isc - cssW / 2,
           iTop + ih / 2 - (p[1] - icy) * isc - cssH / 2,
         ];
+
+        /* A ruled box around each archipelago, captioned in its corner.
+         * Without it the islands read as debris in the ocean west of Porto —
+         * they are drawn at their true spacing but at a scale of their own,
+         * and a frame is how a map says "this panel is somewhere else, at a
+         * different size". Drawn with the same pencil as everything else so
+         * it belongs to the picture rather than sitting on top of it. */
+        // The frame hugs what is drawn, not the cell it was given. The Azores
+        // are two and a third times wider than they are tall, so a frame the
+        // shape of the cell was three-fifths empty sky and read as a mistake.
+        const cxPix = mainLeft / 2 - cssW / 2;
+        const cyPix = iTop + ih / 2 - cssH / 2;
+        const padX = 14;
+        const padTop = 26; // room for the caption on its own line
+        const padBot = 14;
+        const bx0 = cxPix - (iW / 2) * isc - padX;
+        const bx1 = cxPix + (iW / 2) * isc + padX;
+        const by0 = cyPix - (iH / 2) * isc - padTop;
+        const by1 = cyPix + (iH / 2) * isc + padBot;
+        brush.noFill();
+        brush.set('cpencil', pencil, 0.5);
+        brush.polygon(
+          jitter([
+            [bx0, by0],
+            [bx1, by0],
+            [bx1, by1],
+            [bx0, by1],
+          ])
+        );
+        cityLabels.push({
+          name: inset.name ?? '',
+          x: bx0 + cssW / 2 + 9,
+          y: by0 + cssH / 2 + 7,
+          box: true,
+        });
+
         for (const shape of inset.subs ?? []) {
           const rings = (shape.r ?? []).map((flat) => {
             const q: Pt[] = [];
@@ -579,7 +646,7 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
     };
   }, [art, focus, epoch]);
 
-  const [labels, setLabels] = useState<{ name: string; x: number; y: number }[]>([]);
+  const [labels, setLabels] = useState<PlaceLabel[]>([]);
 
   /* ---------------------------------------------------------- interaction */
   const locate = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -613,7 +680,11 @@ export default function AreaArt({ lang, url, focus, base }: Props) {
         }}
       >
         {labels.map((l) => (
-          <span className="aart-place" key={l.name} style={{ left: `${l.x}px`, top: `${l.y}px` }}>
+          <span
+            className={l.box ? 'aart-place aart-inset-name' : 'aart-place'}
+            key={l.name}
+            style={{ left: `${l.x}px`, top: `${l.y}px` }}
+          >
             {l.name}
           </span>
         ))}

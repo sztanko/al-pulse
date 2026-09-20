@@ -619,71 +619,83 @@ async function checkCombinedTimeline(browser) {
   // being tested. The pointer also approaches from elsewhere on the chart in
   // steps — jumping it straight onto a target from its initial (0,0) does not
   // reliably produce the pointerover transition that `enter` is built from.
-  // Re-scroll and re-measure here: everything above ran evaluates and waits,
-  // and a coordinate measured before them is a coordinate against a page that
-  // may have moved since.
   //
-  // Wait for the drawing above the chart first. It is a canvas sized in an
-  // effect after mount, and the place names on it fade in after that; until
-  // both have happened the chart is still moving down the page, and a target
-  // measured in the middle of it is a target the pointer misses. This is the
-  // second time this check has been fixed for taking a coordinate too early.
-  await page.waitForSelector('.aart-canvas.is-drawn', { timeout: 25000 }).catch(() => {});
-  await page.waitForTimeout(700);
-  await page.locator('svg.ts-svg').first().scrollIntoViewIfNeeded();
-  await page.waitForTimeout(250);
-  const svg = await page.locator('svg.ts-svg').first().boundingBox();
-  const park = async () => {
-    if (!svg) return;
-    await page.mouse.move(svg.x + 40, svg.y + svg.height - 30);
-    await page.waitForTimeout(120);
-  };
+  // And nothing here waits a fixed number of milliseconds for an answer. Three
+  // times this check has failed on timing rather than on the feature: twice by
+  // measuring coordinates before the drawing above had finished moving the
+  // chart down the page, and once by giving React 220ms to commit the hover
+  // state on a machine that had just rendered seventy pages and a WebGL canvas.
+  // The tell for the last one was that adding two `console.log`s made it pass.
+  // So: the pointer target is re-measured on every attempt, and the readout is
+  // waited *for* rather than sampled after a sleep.
+  const deadline = Date.now() + 30000;
+  let answered = false;
+  let marks = 0;
+  let lastSeen = 'nothing';
 
-  const marks = await page.locator('.ts-event-hit').count();
-  if (marks === 0) {
-    fail(where, 'no policy marks to hover');
-  } else {
-    let answered = false;
+  while (!answered && Date.now() < deadline) {
+    await page.locator('svg.ts-svg').first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    const svg = await page.locator('svg.ts-svg').first().boundingBox();
+    const park = async () => {
+      if (!svg) return;
+      await page.mouse.move(svg.x + 40, svg.y + svg.height - 30);
+      await page.waitForTimeout(100);
+    };
+
+    marks = await page.locator('.ts-event-hit').count();
+    if (marks === 0) {
+      await page.waitForTimeout(500);
+      continue;
+    }
+
     for (let i = 0; i < marks && !answered; i++) {
       const bb = await page.locator('.ts-event-hit').nth(i).boundingBox();
       if (!bb) continue;
       await park();
       await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 6 });
-      await page.waitForTimeout(250);
-      if ((await page.locator('.ts-readout.is-event').count()) !== 1) continue;
+      const readout = page.locator('.ts-readout.is-event');
+      const appeared = await readout
+        .first()
+        .waitFor({ state: 'visible', timeout: 1500 })
+        .then(() => true)
+        .catch(() => false);
+      if (!appeared || (await readout.count()) !== 1) {
+        lastSeen = await page.evaluate(
+          ([x, y]) => {
+            const el = document.elementFromPoint(x, y);
+            return el ? `${el.tagName}.${el.getAttribute('class') ?? ''}` : 'nothing';
+          },
+          [bb.x + bb.width / 2, bb.y + bb.height / 2]
+        );
+        continue;
+      }
 
       answered = true;
-      const txt = await page.locator('.ts-readout.is-event').innerText();
+      const txt = await readout.innerText();
       if (txt.length < 60) fail(where, `the mark readout is only "${txt}"`);
       if ((await page.locator('.ts-readout:not(.is-event)').count()) !== 0) {
         fail(where, 'the month readout is still up while a mark is hovered');
       }
 
-      // And moving off must hand back to the month readout.
+      // And moving off must hand back to the month readout — waited for, not
+      // sampled, for the same reason.
       await park();
-      if ((await page.locator('.ts-readout.is-event').count()) !== 0) {
-        fail(where, 'the mark description is stuck after moving away');
-      }
+      const cleared = await readout
+        .first()
+        .waitFor({ state: 'detached', timeout: 1500 })
+        .then(() => true)
+        .catch(() => false);
+      if (!cleared) fail(where, 'the mark description is stuck after moving away');
     }
-    if (!answered) {
-      // Say what was actually under the pointer. A bare "it did not respond"
-      // sent me hunting through the component twice for a fault that was in
-      // the approach the test made.
-      const bb = await page.locator('.ts-event-hit').first().boundingBox();
-      const under = bb
-        ? await page.evaluate(
-            ([x, y]) => {
-              const el = document.elementFromPoint(x, y);
-              return el ? `${el.tagName}.${el.getAttribute('class') ?? ''}` : 'nothing';
-            },
-            [bb.x + bb.width / 2, bb.y + bb.height / 2]
-          )
-        : 'no target';
-      fail(
-        where,
-        `none of the ${marks} policy marks showed a description; at the first one the page has ${under}`
-      );
-    }
+  }
+
+  if (!answered) {
+    fail(
+      where,
+      `none of the ${marks} policy marks showed a description within 30s; ` +
+        `under the pointer at the last attempt: ${lastSeen}`
+    );
   }
 
   await ctx.close();

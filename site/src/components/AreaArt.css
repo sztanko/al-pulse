@@ -78,6 +78,19 @@
   font-weight: 700;
 }
 
+/* An inset's caption, in the corner of its frame. Not a place on the map but
+   a name for a panel, so it sits flush in the corner rather than centred on a
+   point, and is quieter than a city. */
+.aart-inset-name {
+  transform: none;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--s-ink-faint);
+  -webkit-text-stroke: 3px var(--s-bg);
+  paint-order: stroke fill;
+}
+
 /* The key. Colour means something here, so it is named — an encoding without
    a key is worse than no encoding. */
 .aart-key {
@@ -99,19 +112,6 @@
 .aart-key i span {
   width: 1.1rem;
   height: 100%;
-}
-
-/* Sits under the key wherever islands have been moved closer together than
-   they lie. A drawing that rearranges its subject has to say so. */
-.aart-note {
-  /* Left, in the page's text column, because that is where the key above it
-     and the lede below it both sit. Centred under a centred drawing sounds
-     right and reads as a third alignment on one screen. */
-  max-width: 46rem;
-  margin: -1rem 0 1.4rem;
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: var(--s-ink-faint);
 }
 
 @media (prefers-reduced-motion: reduce) {
