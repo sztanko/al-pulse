@@ -571,6 +571,12 @@ async function checkCombinedTimeline(browser) {
     waitUntil: 'networkidle',
     timeout: 45000,
   });
+  // The drawn map above the chart arrives late and is 560px tall, so anything
+  // measured before it lands is measured against a page that is about to move.
+  // Wait for it where there is one, then scroll.
+  await page
+    .waitForSelector('.aart-canvas.is-drawn', { timeout: 20000 })
+    .catch(() => {});
   await page.locator('svg.ts-svg').first().scrollIntoViewIfNeeded();
   await page.waitForTimeout(500);
 
@@ -606,50 +612,91 @@ async function checkCombinedTimeline(browser) {
 
   // Hovering a mark must produce its description, and must not leave two
   // readouts on screen at once.
-  const hit = page.locator('.ts-event-hit').nth(3);
-  const bb = await hit.boundingBox();
-  if (!bb) {
-    fail(where, 'no policy mark to hover');
-  } else {
-    await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
-    await page.waitForTimeout(300);
-    const ev = page.locator('.ts-readout.is-event');
-    if ((await ev.count()) !== 1) {
-      fail(where, 'hovering a policy mark shows no description');
-    } else {
-      const txt = await ev.innerText();
-      if (txt.length < 60) fail(where, `the mark readout is only "${txt}"`);
-    }
-    if ((await page.locator('.ts-readout:not(.is-event)').count()) !== 0) {
-      fail(where, 'the month readout is still up while a mark is hovered');
-    }
+  //
+  // Any mark, not a particular one: four of the six fall within fourteen
+  // months of each other and their targets overlap, so which of them a given
+  // coordinate belongs to is a property of the stacking, not of the feature
+  // being tested. The pointer also approaches from elsewhere on the chart in
+  // steps — jumping it straight onto a target from its initial (0,0) does not
+  // reliably produce the pointerover transition that `enter` is built from.
+  // Re-scroll and re-measure here: everything above ran evaluates and waits,
+  // and a coordinate measured before them is a coordinate against a page that
+  // may have moved since.
+  await page.locator('svg.ts-svg').first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
+  const svg = await page.locator('svg.ts-svg').first().boundingBox();
+  const park = async () => {
+    if (!svg) return;
+    await page.mouse.move(svg.x + 40, svg.y + svg.height - 30);
+    await page.waitForTimeout(120);
+  };
 
-    // And moving off must hand back to the month readout.
-    await page.mouse.move(bb.x - 220, bb.y + 60);
-    await page.waitForTimeout(300);
-    if ((await page.locator('.ts-readout.is-event').count()) !== 0) {
-      fail(where, 'the mark description is stuck after moving away');
+  const marks = await page.locator('.ts-event-hit').count();
+  if (marks === 0) {
+    fail(where, 'no policy marks to hover');
+  } else {
+    let answered = false;
+    for (let i = 0; i < marks && !answered; i++) {
+      const bb = await page.locator('.ts-event-hit').nth(i).boundingBox();
+      if (!bb) continue;
+      await park();
+      await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 6 });
+      await page.waitForTimeout(250);
+      if ((await page.locator('.ts-readout.is-event').count()) !== 1) continue;
+
+      answered = true;
+      const txt = await page.locator('.ts-readout.is-event').innerText();
+      if (txt.length < 60) fail(where, `the mark readout is only "${txt}"`);
+      if ((await page.locator('.ts-readout:not(.is-event)').count()) !== 0) {
+        fail(where, 'the month readout is still up while a mark is hovered');
+      }
+
+      // And moving off must hand back to the month readout.
+      await park();
+      if ((await page.locator('.ts-readout.is-event').count()) !== 0) {
+        fail(where, 'the mark description is stuck after moving away');
+      }
+    }
+    if (!answered) {
+      // Say what was actually under the pointer. A bare "it did not respond"
+      // sent me hunting through the component twice for a fault that was in
+      // the approach the test made.
+      const bb = await page.locator('.ts-event-hit').first().boundingBox();
+      const under = bb
+        ? await page.evaluate(
+            ([x, y]) => {
+              const el = document.elementFromPoint(x, y);
+              return el ? `${el.tagName}.${el.getAttribute('class') ?? ''}` : 'nothing';
+            },
+            [bb.x + bb.width / 2, bb.y + bb.height / 2]
+          )
+        : 'no target';
+      fail(
+        where,
+        `none of the ${marks} policy marks showed a description; at the first one the page has ${under}`
+      );
     }
   }
 
   await ctx.close();
 }
 
-/** The district portrait.
+/** The drawn area maps.
  *
- * Decorative, so nothing on the page depends on it — which is exactly why it
- * needs checking: if it silently stopped drawing, nothing else would fail. The
- * two failures it has actually had were a brush name that does not exist in
- * the shipped build, and a canvas cleared to opaque white, which is invisible
- * on a light page and a white slab on a dark one.
+ * They are decorative *and* navigational now, which is exactly why they need
+ * checking: nothing else on the page fails if they stop drawing. Past failures
+ * were a brush name that does not exist in the shipped build, a canvas cleared
+ * to opaque white (invisible on a light page, a white slab on a dark one), a
+ * square viewport that rendered a wide district at a quarter size, and overlays
+ * positioned against the wrong box so every place name sat outside the map.
  */
-async function checkDistrictArt(browser) {
-  const where = 'district art';
+async function checkAreaArt(browser) {
+  const where = 'area art';
 
-  /** Fraction of the canvas that is not the background colour. */
-  const inkShare = async (page) =>
+  /** Fraction of the canvas that is not its background colour. */
+  const inkShare = (page) =>
     page.evaluate(() => {
-      const c = document.querySelector('.dart-canvas');
+      const c = document.querySelector('.aart-canvas');
       if (!c) return null;
       const tmp = document.createElement('canvas');
       tmp.width = c.width;
@@ -657,10 +704,8 @@ async function checkDistrictArt(browser) {
       const ctx = tmp.getContext('2d');
       ctx.drawImage(c, 0, 0);
       const d = ctx.getImageData(0, 0, tmp.width, tmp.height).data;
-      // The corner is background by construction — the drawing is inset.
       const bg = [d[0], d[1], d[2]];
       let drawn = 0;
-      const total = d.length / 4;
       for (let i = 0; i < d.length; i += 4) {
         if (
           Math.abs(d[i] - bg[0]) > 10 ||
@@ -670,68 +715,111 @@ async function checkDistrictArt(browser) {
           drawn++;
         }
       }
-      return { bg, share: drawn / total };
+      return { bg, share: drawn / (d.length / 4) };
     });
 
-  for (const theme of ['light', 'dark']) {
-    const ctx = await browser.newContext({ viewport: { width: 1180, height: 900 } });
-    const page = await ctx.newPage();
-    const errors = [];
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 160)));
+  // One of every level, because each takes a different path through the
+  // component: the country has insets, a locality shares its municipality's
+  // file and has no children to colour.
+  const ROUTES = [
+    ['/', 'country'],
+    ['/areas/faro', 'region'],
+    ['/areas/albufeira_faro', 'municipality'],
+    ['/areas/carregueira_chamusca_santarem', 'locality'],
+  ];
 
-    await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/faro`, {
-      waitUntil: 'networkidle',
-      timeout: 45000,
-    });
-    await page.evaluate((t) => {
-      localStorage.setItem('al-theme', t);
-      document.documentElement.setAttribute('data-theme', t);
-    }, theme);
-    await page.reload({ waitUntil: 'networkidle', timeout: 45000 });
+  for (const [route, level] of ROUTES) {
+    for (const theme of level === 'region' ? ['light', 'dark'] : ['light']) {
+      const ctx = await browser.newContext({ viewport: { width: 1180, height: 1000 } });
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 180)));
 
-    try {
-      await page.waitForSelector('.dart-canvas.is-drawn', { timeout: 20000 });
-    } catch {
-      fail(`${where} [${theme}]`, `never finished drawing${errors.length ? ': ' + errors[0] : ''}`);
+      await page.goto(`http://127.0.0.1:${PORT}${BASE}${route}`, {
+        waitUntil: 'networkidle',
+        timeout: 45000,
+      });
+      await page.evaluate((t) => {
+        localStorage.setItem('al-theme', t);
+        document.documentElement.setAttribute('data-theme', t);
+      }, theme);
+      await page.reload({ waitUntil: 'networkidle', timeout: 45000 });
+
+      const label = `${where} ${level}/${theme}`;
+      try {
+        await page.waitForSelector('.aart-canvas.is-drawn', { timeout: 25000 });
+      } catch {
+        fail(label, `never drew${errors.length ? ': ' + errors[0] : ''}`);
+        await ctx.close();
+        continue;
+      }
+
+      const ink = await inkShare(page);
+      if (!ink || ink.share < 0.05) {
+        fail(label, `only ${((ink?.share ?? 0) * 100).toFixed(1)}% of the canvas is drawn on`);
+      } else {
+        const pageBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+        const want = (pageBg.match(/\d+/g) ?? []).slice(0, 3).map(Number);
+        if (Math.max(...want.map((v, i) => Math.abs(v - ink.bg[i]))) > 12) {
+          fail(label, `canvas background rgb(${ink.bg}) but the page is ${pageBg}`);
+        }
+      }
+
+      // The subject must fill a decent share of the frame. A square viewport
+      // put a wide district at a quarter of the width, which no other
+      // assertion here would have noticed.
+      const box = await page.locator('.aart-canvas').boundingBox();
+      if (box && box.width < 180) fail(label, `canvas is only ${Math.round(box.width)}px wide`);
+
+      // Place names must land on the map, not beside it.
+      const stray = await page.evaluate(() => {
+        const stage = document.querySelector('.aart-stage');
+        if (!stage) return 'no stage';
+        const s = stage.getBoundingClientRect();
+        for (const el of document.querySelectorAll('.aart-place')) {
+          const r = el.getBoundingClientRect();
+          const mx = r.left + r.width / 2;
+          const my = r.top + r.height / 2;
+          if (mx < s.left - 4 || mx > s.right + 4 || my < s.top - 4 || my > s.bottom + 4) {
+            return el.textContent;
+          }
+        }
+        return null;
+      });
+      if (stray) fail(label, `place name "${stray}" is outside the drawing`);
+
+      if (errors.length) fail(label, `console error: ${errors[0]}`);
       await ctx.close();
-      continue;
     }
-
-    const ink = await inkShare(page);
-    if (!ink) {
-      fail(`${where} [${theme}]`, 'no canvas');
-    } else {
-      // A blank canvas and a drawn one are the same size and the same element.
-      if (ink.share < 0.05) {
-        fail(`${where} [${theme}]`, `only ${(ink.share * 100).toFixed(1)}% of the canvas is drawn on`);
-      }
-      // The canvas must sit on the page's own background, not on white.
-      const pageBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      const want = (pageBg.match(/\d+/g) ?? []).slice(0, 3).map(Number);
-      const off = want.map((v, i) => Math.abs(v - ink.bg[i]));
-      if (Math.max(...off) > 12) {
-        fail(
-          `${where} [${theme}]`,
-          `canvas background is rgb(${ink.bg}) but the page is ${pageBg}`
-        );
-      }
-    }
-    if (errors.length) fail(`${where} [${theme}]`, `console error: ${errors[0]}`);
-    await ctx.close();
   }
 
-  // And it belongs to districts only: a municipality's silhouette without the
-  // coast around it is a fragment.
-  const ctx = await browser.newContext({ viewport: { width: 1180, height: 900 } });
+  // Hovering an area must name it, and clicking must open it.
+  const ctx = await browser.newContext({ viewport: { width: 1180, height: 1000 } });
   const page = await ctx.newPage();
-  await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/albufeira_faro`, {
+  await page.goto(`http://127.0.0.1:${PORT}${BASE}/areas/faro`, {
     waitUntil: 'networkidle',
     timeout: 45000,
   });
-  await page.waitForTimeout(800);
-  if ((await page.locator('.dart').count()) !== 0) {
-    fail(where, 'a municipality page carries a district portrait');
+  await page.waitForSelector('.aart-canvas.is-drawn', { timeout: 25000 });
+  const c = await page.locator('.aart-canvas').boundingBox();
+
+  let found = false;
+  for (const [fx, fy] of [[0.5, 0.5], [0.45, 0.55], [0.6, 0.45], [0.55, 0.6]]) {
+    await page.mouse.move(c.x + c.width * fx, c.y + c.height * fy);
+    await page.waitForTimeout(160);
+    if (await page.locator('.aart-readout').count()) {
+      found = true;
+      const txt = await page.locator('.aart-readout').innerText();
+      if (!/\d/.test(txt)) fail(where, `the readout "${txt}" carries no count`);
+      await page.mouse.click(c.x + c.width * fx, c.y + c.height * fy);
+      await page.waitForLoadState('networkidle');
+      if (!/\/areas\//.test(page.url())) {
+        fail(where, `clicking an area went to ${page.url()}`);
+      }
+      break;
+    }
   }
+  if (!found) fail(where, 'hovering the drawing named nothing');
   await ctx.close();
 }
 
@@ -755,7 +843,7 @@ try {
   await checkPolicyMarks(browser);
   await checkLanguages(browser);
   await checkCombinedTimeline(browser);
-  await checkDistrictArt(browser);
+  await checkAreaArt(browser);
 } catch (e) {
   fail('harness', String(e).slice(0, 300));
 } finally {
@@ -770,5 +858,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `verify ok — ${ROUTES.length + PT_ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas, the policy marks, both languages, the combined timeline and the district art`
+  `verify ok — ${ROUTES.length + PT_ROUTES.length} routes × ${THEMES.length} themes × ${VIEWPORTS.length} viewports, plus the slider, the tabs, the room mix, the untimed areas, the policy marks, both languages, the combined timeline and the area maps`
 );

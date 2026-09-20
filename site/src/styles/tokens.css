@@ -58,6 +58,21 @@
   --m-seq-8: #b30000;
   --m-seq-9: #7f0000;
 
+  /* Diverging, for the drawn area maps: how a subarea's registration count
+   * sits against the median of its siblings. Teal below, warm above, with a
+   * near-paper middle so the ordinary ones recede and the ends carry.
+   *
+   * Separate from --m-seq-* on purpose. That ramp answers "how much"; this one
+   * answers "which side of typical", and using one for the other is how a
+   * chart ends up implying an origin it does not have. */
+  --m-div-1: #00635c;
+  --m-div-2: #4aa79d;
+  --m-div-3: #a8dbd3;
+  --m-div-4: #ece7da;
+  --m-div-5: #f2c89a;
+  --m-div-6: #d2823d;
+  --m-div-7: #92400e;
+
   /* type + metrics */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
@@ -113,6 +128,14 @@
     --m-seq-7: #e88b57;
     --m-seq-8: #f3a97c;
     --m-seq-9: #ffc9a4;
+
+    --m-div-1: #6fded0;
+    --m-div-2: #33a89b;
+    --m-div-3: #1d6a63;
+    --m-div-4: #3a3a41;
+    --m-div-5: #7d4c22;
+    --m-div-6: #c67a33;
+    --m-div-7: #f2ad63;
   }
 }
 
@@ -158,4 +181,12 @@
   --m-seq-7: #e88b57;
   --m-seq-8: #f3a97c;
   --m-seq-9: #ffc9a4;
+
+  --m-div-1: #6fded0;
+  --m-div-2: #33a89b;
+  --m-div-3: #1d6a63;
+  --m-div-4: #3a3a41;
+  --m-div-5: #7d4c22;
+  --m-div-6: #c67a33;
+  --m-div-7: #f2ad63;
 }

@@ -4,6 +4,8 @@ import Metric from '../components/Metric.astro';
 import RoomMix from '../components/RoomMix.astro';
 import AzoresNote from '../components/AzoresNote.astro';
 import EventKey from '../components/EventKey.astro';
+import AreaArt from '../components/AreaArt.tsx';
+import AreaArtKey from '../components/AreaArtKey.astro';
 import TimeSeries from '../components/TimeSeries.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import {
@@ -22,7 +24,9 @@ const m = meta();
 const c = country();
 const f = fmt(lang);
 const regions = areasOfType('region');
-const base = langBase(import.meta.env.BASE_URL.replace(/\/$/, ''), lang);
+const plainBase = import.meta.env.BASE_URL.replace(/\/$/, '');
+// Links follow the reader's language; assets do not — /pt/geo/… is not a file.
+const base = langBase(plainBase, lang);
 
 const months = m.months;
 const last = months.length - 1;
@@ -94,6 +98,18 @@ const lastMonth = f.monthLabel(m.data_through);
       how big the register is, what is leaving it, and how unevenly it sits on
       the map. Laid out as one flat row they read as a single list of facts of
       equal kind, which they are not. */}
+  {/* The mainland, with the archipelagos as insets: a box containing both
+      Portugal and the Azores is 2,000 km wide and puts the subject in one
+      corner of it. */}
+  <AreaArt
+    client:only="react"
+    lang={lang}
+    url={`${plainBase}/geo/art/country.json`}
+    focus="portugal"
+    base={base}
+  />
+  <AreaArtKey lang={lang} what={t(lang, 'art.of_districts')} />
+
   <div class="metric-groups" aria-label={t(lang, 'home.g_register')}>
     <section class="metric-group" aria-labelledby="g-size">
       <h2 class="metric-group-title" id="g-size">{t(lang, 'home.g_register')}</h2>
