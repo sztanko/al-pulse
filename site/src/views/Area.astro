@@ -9,7 +9,6 @@ import AreaTable from '../components/AreaTable.tsx';
 import AzoresNote from '../components/AzoresNote.astro';
 import EventKey from '../components/EventKey.astro';
 import AreaArt from '../components/AreaArt.tsx';
-import AreaArtKey from '../components/AreaArtKey.astro';
 import Tabs from '../components/Tabs.astro';
 import {
   areas, shard, meta, events, childrenOf, localitiesUnder, lostSummary,
@@ -109,16 +108,6 @@ const artUrl =
   a.admin_type === 'locality'
     ? `${plainBase}/geo/art/locality/${a.municipality_slug}.json`
     : `${plainBase}/geo/art/${a.admin_type}/${a.slug}.json`;
-// What the colours are *of*: an area's children, or its neighbours where it
-// has none.
-const artWhat = (
-  a.admin_type === 'region'
-    ? 'art.of_municipalities'
-    : a.admin_type === 'municipality'
-      ? 'art.of_localities'
-      : 'art.of_neighbours'
-) as Parameters<typeof t>[1];
-
 // Peak over observed months only — between pulls the series is interpolated
 // and its maximum is an artefact of when we looked.
 const pk = observedPeak(S.cum_c);
@@ -154,7 +143,6 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
     focus={a.slug}
     base={base}
   />
-  <AreaArtKey lang={lang} what={t(lang, artWhat)} />
   <p class="lede">
     {
       shrinking

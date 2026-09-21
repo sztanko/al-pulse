@@ -502,15 +502,6 @@ const DICT = {
   }),
 
   // ------------------------------------------------------- the drawn maps
-  'art.key_low': entry({ en: 'fewer ALs', pt: 'menos AL' }),
-  'art.key_high': entry({
-    en: 'more, against the median of these {what}',
-    pt: 'mais, face à mediana destas {what}',
-  }),
-  'art.of_districts': entry({ en: 'districts', pt: 'distritos' }),
-  'art.of_municipalities': entry({ en: 'municipalities', pt: 'municípios' }),
-  'art.of_localities': entry({ en: 'localities', pt: 'freguesias' }),
-  'art.of_neighbours': entry({ en: 'neighbours', pt: 'vizinhas' }),
 } satisfies Record<string, Record<Lang, string>>;
 
 export type Key = keyof typeof DICT;

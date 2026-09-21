@@ -5,7 +5,6 @@ import RoomMix from '../components/RoomMix.astro';
 import AzoresNote from '../components/AzoresNote.astro';
 import EventKey from '../components/EventKey.astro';
 import AreaArt from '../components/AreaArt.tsx';
-import AreaArtKey from '../components/AreaArtKey.astro';
 import TimeSeries from '../components/TimeSeries.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import {
@@ -108,7 +107,6 @@ const lastMonth = f.monthLabel(m.data_through);
     focus="portugal"
     base={base}
   />
-  <AreaArtKey lang={lang} what={t(lang, 'art.of_districts')} />
 
   <div class="metric-groups" aria-label={t(lang, 'home.g_register')}>
     <section class="metric-group" aria-labelledby="g-size">

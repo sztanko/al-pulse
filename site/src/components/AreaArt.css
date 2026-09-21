@@ -91,29 +91,6 @@
   paint-order: stroke fill;
 }
 
-/* The key. Colour means something here, so it is named — an encoding without
-   a key is worse than no encoding. */
-.aart-key {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  margin: 0 0 1.4rem;
-  font-size: 0.78rem;
-  color: var(--s-ink-faint);
-}
-.aart-key i {
-  display: inline-flex;
-  height: 0.7rem;
-  border-radius: 2px;
-  overflow: hidden;
-  border: 1px solid var(--s-rule);
-}
-.aart-key i span {
-  width: 1.1rem;
-  height: 100%;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .aart-canvas {
     transition: none;
