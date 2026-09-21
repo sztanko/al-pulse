@@ -316,6 +316,32 @@ def build_meta(
         m for m in axis
         if loss_from and m >= loss_from and m not in obs
     ]
+
+    # How long each loss figure actually covers.
+    #
+    # A lost licence is only visible as the difference between two consecutive
+    # pulls, so the number reported for a month is really the number for
+    # "everything since the pull before it". While the register is pulled every
+    # month that is one month and nobody need think about it. The register was
+    # not pulled between March and September 2026, so September's figure covers
+    # six months — drawn in one month's width it is a cliff six times taller
+    # than anything around it, and it reads as a catastrophic September rather
+    # than as half a year of ordinary attrition.
+    #
+    # Only spans longer than a month are recorded; a month is the default and
+    # listing 170 of them would be noise.
+    #
+    # The arrivals series has no equivalent problem and must not be given one:
+    # each record carries its own registration date, so a pull in September
+    # still attributes an April registration to April.
+    spans = []
+    for prev, cur in zip(observed, observed[1:]):
+        if prev not in axis or cur not in axis:
+            continue
+        n = axis.index(cur) - axis.index(prev)
+        if n > 1:
+            spans.append({"month": cur, "since": prev, "months": n})
+
     return {
         "months": axis,
         "observed_months": observed,
@@ -323,6 +349,7 @@ def build_meta(
         # Months inside the loss window that no pull brackets: the loss figure
         # there is "not observed", not zero.
         "unobserved_months": unobserved,
+        "loss_spans": spans,
         "generated": date.today().isoformat(),
         "data_through": axis[-1],
         "counts": {

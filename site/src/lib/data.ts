@@ -30,6 +30,10 @@ export interface Meta {
   /** Months inside that window with no pull: the loss figure is unknown there,
    * not zero. */
   unobserved_months: string[];
+  /** Loss figures that cover more than the month they are filed under, because
+   * the pull before them was more than a month earlier. Only spans longer than
+   * one month appear. */
+  loss_spans: { month: string; since: string; months: number }[];
   generated: string;
   data_through: string;
   counts: {
@@ -242,6 +246,22 @@ export const lossStartIndex = (): number => {
 export const unobservedIndices = (): number[] => {
   const ms = meta().months;
   return meta().unobserved_months.map((m) => ms.indexOf(m)).filter((i) => i >= 0);
+};
+
+/** How many months each loss figure covers, one entry per month of the axis.
+ *
+ * One almost everywhere. Where the register went unpulled for a while the
+ * figure filed under the next pull covers the whole interval, and a chart that
+ * draws it one month wide claims a cliff that did not happen.
+ */
+export const lossSpans = (): number[] => {
+  const ms = meta().months;
+  const spans = ms.map(() => 1);
+  for (const s of meta().loss_spans ?? []) {
+    const i = ms.indexOf(s.month);
+    if (i >= 0 && s.months > 1) spans[i] = s.months;
+  }
+  return spans;
 };
 
 /** The peak of a cumulative series, *restricted to observed months*.

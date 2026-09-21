@@ -38,6 +38,32 @@
   fill-opacity: 0.75;
 }
 
+/* A figure covering more than one month, drawn across all of them at the
+   average rate. Hatched rather than solid so it cannot be mistaken for the
+   run of separate monthly measurements it is standing in for. */
+.ts-bar-neg.is-spread {
+  fill-opacity: 1;
+  stroke: var(--m-negative);
+  stroke-width: 1;
+  stroke-opacity: 0.55;
+}
+.ts-spread-bg {
+  fill: var(--m-negative);
+  fill-opacity: 0.16;
+}
+.ts-spread-line {
+  stroke: var(--m-negative);
+  stroke-width: 2.5;
+  stroke-opacity: 0.7;
+}
+.swatch-bar-neg.is-spread {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--m-negative) 0 2px,
+    transparent 2px 4px
+  );
+}
+
 .ts-zero {
   stroke: var(--s-ink-faint);
   stroke-width: 1;
@@ -130,6 +156,13 @@
 }
 .ts-readout.is-flipped {
   transform: translateX(calc(-100% - 8px));
+}
+
+/* Wider when it is carrying the note about a spread block: at the default
+   width the row label wrapped onto four lines and the box became a column of
+   single words. */
+.ts-readout.is-wide {
+  min-width: 17rem;
 }
 
 /* On a narrow screen there is no room to place a box beside a mark without it

@@ -480,6 +480,14 @@ const DICT = {
     pt: 'perdas ainda não observáveis',
   }),
   'ts.not_observed_short': entry({ en: 'not observed', pt: 'não observado' }),
+  // Said wherever a downward figure covers more than the month it is filed
+  // under. The number shown stays the monthly average, so the note carries the
+  // total and the period it really belongs to.
+  'ts.spread_avg': entry({ en: 'a month, averaged', pt: 'por mês, em média' }),
+  'ts.spread_note': entry({
+    en: '{total} left the register between {from} and {to}. The register was not pulled in between, so exactly when they went is unknown — the block is that total spread evenly across those {n} months.',
+    pt: '{total} saíram do registo entre {from} e {to}. O registo não foi recolhido nesse intervalo, pelo que se desconhece quando saíram — o bloco é esse total distribuído uniformemente por esses {n} meses.',
+  }),
   'chart.lost_month_neg': entry({
     en: 'Left the register that month',
     pt: 'Saíram do registo nesse mês',
