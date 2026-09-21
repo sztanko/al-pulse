@@ -9,7 +9,7 @@ import TimeSeries from '../components/TimeSeries.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import {
   meta, country, areasOfType, lostSummary, observedPeak,
-  lossStartIndex, unobservedIndices,
+  lossStartIndex, unobservedIndices, lossSpans,
 } from '../lib/data';
 import { fmt } from '../lib/format';
 import { langBase, t, type Lang } from '../lib/i18n';
@@ -222,6 +222,7 @@ const lastMonth = f.monthLabel(m.data_through);
       negBarLabel={t(lang, 'chart.lost_month_neg')}
       negStartIndex={lossStartIndex()}
       negUnobserved={unobservedIndices()}
+      negSpans={lossSpans()}
       events={events}
       height={420}
     />

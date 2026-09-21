@@ -602,6 +602,113 @@ async function checkCombinedTimeline(browser) {
   }
   if (geom.neg.length === 0) fail(where, 'no downward bars drawn');
 
+  /* A loss figure covering more than one month is drawn across the months it
+   * covers, at the average rate, as one hatched block.
+   *
+   * The two things that make it honest are both checked here, because both
+   * are easy to break and neither shows up as an error: the block must be
+   * wider than a month, and it must NOT be taller than a genuine one-month
+   * loss that is smaller than its total. September 2026 carries 6,389 over six
+   * months; February 2026 lost 6,471 in one. If the spread block is ever the
+   * taller of the two, the average is not being taken and the chart is back to
+   * claiming a catastrophe in September. */
+  const spread = await page.evaluate(() => {
+    const svg = document.querySelector('svg.ts-svg');
+    if (!svg) return null;
+    const box = (r) => ({
+      w: Number(r.getAttribute('width')),
+      h: Number(r.getAttribute('height')),
+    });
+    const blocks = [...svg.querySelectorAll('.ts-bar-neg.is-spread')].map((r) => ({
+      ...box(r),
+      span: Number(r.dataset.span),
+      total: Number(r.dataset.total),
+    }));
+    const plain = [...svg.querySelectorAll('.ts-bar-neg:not(.is-spread)')].map((r) => ({
+      ...box(r),
+      value: Number(r.dataset.value),
+    }));
+    const fill = blocks.length
+      ? getComputedStyle(svg.querySelector('.ts-bar-neg.is-spread')).fill
+      : '';
+    // Pixels per unit, from the tallest ordinary bar (the least affected by
+    // rounding of a sub-pixel height).
+    const ref = plain
+      .filter((b) => b.value > 0 && b.h > 0)
+      .sort((a, c) => c.h - a.h)[0];
+    return {
+      blocks,
+      widestPlain: Math.max(0, ...plain.map((b) => b.w)),
+      tallestPlain: Math.max(0, ...plain.map((b) => b.h)),
+      scale: ref ? ref.h / ref.value : 0,
+      fill,
+    };
+  });
+
+  if (!spread || spread.blocks.length !== 1) {
+    fail(where, `expected 1 spread block, found ${spread?.blocks.length ?? 'none'}`);
+  } else {
+    const b = spread.blocks[0];
+    if (b.w < spread.widestPlain * 2) {
+      fail(where, `the spread block is ${b.w.toFixed(1)} wide, barely more than a month`);
+    }
+    if (b.h >= spread.tallestPlain) {
+      fail(
+        where,
+        `the spread block is ${b.h.toFixed(1)} tall against a one-month bar of ` +
+          `${spread.tallestPlain.toFixed(1)}: its total is not being averaged`
+      );
+    }
+    // That bound alone is too weak to trust: February 2026 lost 6,471 in one
+    // real month against September's 6,389 over six, so an unaveraged block
+    // would still squeak under it and the check would pass while the chart
+    // lied. So assert the arithmetic instead — recover the value-to-pixel
+    // scale from an ordinary monthly bar, and require the block's height to be
+    // its own total divided by its own span.
+    if (!(b.span > 1) || !(b.total > 0)) {
+      fail(where, `the spread block declares span=${b.span} total=${b.total}`);
+    } else if (!spread.scale) {
+      fail(where, 'no monthly bar to take the scale from');
+    } else {
+      const want = (b.total / b.span) * spread.scale;
+      if (Math.abs(b.h - want) > Math.max(0.5, want * 0.02)) {
+        fail(
+          where,
+          `the spread block is ${b.h.toFixed(1)}px for ${b.total} over ${b.span} months; ` +
+            `the monthly average would be ${want.toFixed(1)}px`
+        );
+      }
+    }
+    // It must not read as a run of ordinary bars.
+    if (!/url\(/.test(spread.fill)) {
+      fail(where, `the spread block is filled with ${spread.fill}, not the hatch`);
+    }
+  }
+
+  // And a month inside it must say what it is rather than showing a number
+  // that looks like a measurement.
+  {
+    const bb = await page.locator('svg.ts-svg').first().boundingBox();
+    let said = false;
+    for (const f of [0.93, 0.94, 0.95, 0.96]) {
+      await page.mouse.move(bb.x + bb.width * f, bb.y + bb.height * 0.8, { steps: 6 });
+      const note = page.locator('.ts-readout.is-wide .ts-readout-desc');
+      const up = await note
+        .first()
+        .waitFor({ state: 'visible', timeout: 1200 })
+        .then(() => true)
+        .catch(() => false);
+      if (!up) continue;
+      const txt = await note.first().innerText();
+      if (!/6,389|6389/.test(txt)) {
+        fail(where, `the spread note does not carry the total: "${txt.slice(0, 80)}"`);
+      }
+      said = true;
+      break;
+    }
+    if (!said) fail(where, 'hovering inside the spread block explained nothing');
+  }
+
   // Nothing may leave the drawing. The inner group is translated down by the
   // top padding, so compare against the viewBox height with that added.
   const PAD_TOP = 14;

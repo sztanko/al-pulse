@@ -12,7 +12,7 @@
  *  - it answers wherever the pointer is, snapping to the nearest month;
  *  - arrow keys step through the series, and focus reveals what hover reveals.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { timeTicks } from '../lib/ticks';
 /* Both dictionaries ship to the browser rather than the strings being threaded
  * in as props. The whole dictionary is a few kilobytes beside the geometry and
@@ -64,6 +64,9 @@ export interface Props {
    * before the second pull there is nothing to see. */
   negStartIndex?: number;
   negUnobserved?: number[];
+  /** How many months each downward figure covers, one per month of `months`.
+   * One almost everywhere; longer where the register went unpulled. */
+  negSpans?: number[];
 }
 
 /** Horizontal room a policy mark needs before the next one has to drop a
@@ -94,6 +97,7 @@ export default function TimeSeries({
   negBarLabel,
   negStartIndex = 0,
   negUnobserved = [],
+  negSpans = [],
 }: Props) {
   const f = fmt(lang);
   const label = f.monthShort;
@@ -109,6 +113,9 @@ export default function TimeSeries({
    * competing for the same corner is how a chart stops being readable. */
   const [hoverEvent, setHoverEvent] = useState<number | null>(null);
   const fmtLine = lineFormat === 'pct' ? fmtPct : fmtInt;
+  /** Pattern ids have to be unique per instance: two charts on one page would
+   * otherwise share a definition and the second would paint with the first's. */
+  const uid = useId().replace(/:/g, '');
 
   // "Not observed" is not "zero". Where no pull brackets a month, the value is
   // unknown: drop it rather than draw a number the data cannot support.
@@ -140,6 +147,32 @@ export default function TimeSeries({
   /** Where the downward series starts being knowable, on the sliced axis. */
   const negFrom = Math.max(0, negStartIndex - s0);
 
+  /* A downward figure covers everything since the previous pull, which is one
+   * month while the register is pulled monthly and was six months across the
+   * 2026 gap. Drawn in a single month's width that is a cliff six times taller
+   * than its neighbours, and it reads as a catastrophic September rather than
+   * as half a year of ordinary attrition.
+   *
+   * So a figure spanning several months is drawn across all of them, at the
+   * average monthly rate. The block's *area* is the true total and its height
+   * is comparable to the bars beside it — which is what a bar in a flow panel
+   * means. It is drawn as one hatched block rather than as N separate bars
+   * precisely so that nobody reads it as N measurements: it is one
+   * observation, and its width is how long it took. */
+  const negSpanAt = useMemo(() => negSpans.slice(s0), [negSpans, s0]);
+  const spreadAt = useMemo(() => {
+    const at: ({ end: number; span: number; total: number } | null)[] = months2.map(
+      () => null
+    );
+    negBars2?.forEach((v, i) => {
+      const span = negSpanAt[i] ?? 1;
+      if (v == null || span <= 1) return;
+      const block = { end: i, span, total: Math.abs(v) };
+      for (let k = Math.max(0, i - span + 1); k <= i; k++) at[k] = block;
+    });
+    return at;
+  }, [negBars2, negSpanAt, months2]);
+
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -159,9 +192,16 @@ export default function TimeSeries({
     let down = 0;
     for (const v of line2) if (v != null && v > lm) lm = v;
     for (const v of bars2) if (v != null && v > up) up = v;
-    for (const v of negBars2 ?? []) if (v != null && Math.abs(v) > down) down = Math.abs(v);
+    // The *drawn* magnitude, which for a spread block is its monthly average.
+    // Using the raw total here would keep the catch-up figure setting the
+    // scale for the whole panel, which is the thing being fixed.
+    (negBars2 ?? []).forEach((v, i) => {
+      if (v == null) return;
+      const mag = Math.abs(v) / Math.max(1, negSpanAt[i] ?? 1);
+      if (mag > down) down = mag;
+    });
     return { lineMax: lm || 1, barMaxPos: up || 1, barMaxNeg: down };
-  }, [line2, bars2, negBars2]);
+  }, [line2, bars2, negBars2, negSpanAt]);
 
   const n = months2.length;
   const x = useCallback(
@@ -317,6 +357,12 @@ export default function TimeSeries({
   };
 
   const hv = hover != null ? months2[hover] : null;
+
+  /** The spread block covering the hovered month, if any: its number is an
+
+   * average, so the readout has to say so rather than show it bare. */
+
+  const spread = hover == null ? null : (spreadAt[hover] ?? null);
   const readoutLeft = hover != null ? PAD.left + x(hover) : 0;
   const flip = readoutLeft > w * 0.62;
   const eventLeft =
@@ -343,6 +389,21 @@ export default function TimeSeries({
         onFocus={() => setHover((h) => h ?? n - 1)}
         onBlur={() => setHover(null)}
       >
+        {/* The hatch that marks a figure covering more than one month. It has
+            to be visibly not-a-bar: same colour, so it reads as the same
+            series, but obviously one block rather than several. */}
+        <defs>
+          <pattern
+            id={`${uid}-spread`}
+            width="6"
+            height="6"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
+            <rect width="6" height="6" className="ts-spread-bg" />
+            <line x1="0" y1="0" x2="0" y2="6" className="ts-spread-line" />
+          </pattern>
+        </defs>
         <g transform={`translate(${PAD.left},${PAD.top})`}>
           {yTicks.map((v, k) => (
             <g key={k} transform={`translate(0,${yLine(v).toFixed(2)})`}>
@@ -439,18 +500,47 @@ export default function TimeSeries({
             )
           )}
 
-          {negBars2?.map((v, i) =>
-            v == null || v === 0 ? null : (
+          {negBars2?.map((v, i) => {
+            if (v == null || v === 0) return null;
+            const span = Math.max(1, negSpanAt[i] ?? 1);
+            const h = (Math.abs(v) / span) * barScale;
+            if (span === 1) {
+              return (
+                <rect
+                  key={`n${i}`}
+                  className="ts-bar-neg"
+                  /* Lets the build check recover the value-to-pixel scale and
+                     so assert that the spread block really is an average. */
+                  data-value={Math.abs(v)}
+                  x={(x(i) - barW / 2).toFixed(2)}
+                  width={barW.toFixed(2)}
+                  y={baseY.toFixed(2)}
+                  height={h.toFixed(2)}
+                />
+              );
+            }
+            // One observation, drawn across the months it actually covers.
+            const left = x(Math.max(0, i - span + 1)) - barW / 2;
+            const right = x(i) + barW / 2;
+            return (
               <rect
                 key={`n${i}`}
-                className="ts-bar-neg"
-                x={(x(i) - barW / 2).toFixed(2)}
-                width={barW.toFixed(2)}
+                className="ts-bar-neg is-spread"
+                /* Inline, not a `fill` attribute: `.ts-bar-neg { fill }` in the
+                   stylesheet outranks a presentation attribute, so the hatch
+                   was painted over with flat red. */
+                style={{ fill: `url(#${uid}-spread)` }}
+                /* What the block stands for, so the build check can assert the
+                   arithmetic rather than eyeball the pixels. */
+                data-span={span}
+                data-total={Math.abs(v)}
+                x={left.toFixed(2)}
+                width={Math.max(1, right - left).toFixed(2)}
                 y={baseY.toFixed(2)}
-                height={(Math.abs(v) * barScale).toFixed(2)}
+                height={h.toFixed(2)}
               />
-            )
-          )}
+            );
+          })}
 
           {hasFlow && (
             <>
@@ -506,7 +596,9 @@ export default function TimeSeries({
 
       {hv && hoverEvent == null && (
         <div
-          className={`ts-readout${narrow ? ' is-pinned' : ''}${flip ? ' is-flipped' : ''}`}
+          className={`ts-readout${narrow ? ' is-pinned' : ''}${flip ? ' is-flipped' : ''}${
+            spread ? ' is-wide' : ''
+          }`}
           style={narrow ? undefined : { left: `${readoutLeft}px` }}
           role="status"
         >
@@ -523,14 +615,26 @@ export default function TimeSeries({
           </div>
           {negBars2 && negBarLabel && (
             <div className="ts-readout-row">
-              <i className="swatch-bar-neg" />
+              <i className="swatch-bar-neg is-spread" />
               <span>{negBarLabel}</span>
               <b className="num">
                 {hover! < negFrom
                   ? t(lang, 'ts.not_observed_short')
-                  : fmtInt(negBars2[hover!] ?? null)}
+                  : spread
+                    ? `${fmtInt(Math.round(spread.total / spread.span))} ${t(lang, 'ts.spread_avg')}`
+                    : fmtInt(negBars2[hover!] ?? null)}
               </b>
             </div>
+          )}
+          {spread && (
+            <p className="ts-readout-desc">
+              {t(lang, 'ts.spread_note', {
+                total: fmtInt(spread.total),
+                from: label(months2[Math.max(0, spread.end - spread.span)] ?? ''),
+                to: label(months2[spread.end] ?? ''),
+                n: String(spread.span),
+              })}
+            </p>
           )}
         </div>
       )}
