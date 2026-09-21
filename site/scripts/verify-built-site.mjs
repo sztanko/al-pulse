@@ -700,8 +700,20 @@ async function checkCombinedTimeline(browser) {
         .catch(() => false);
       if (!up) continue;
       const txt = await note.first().innerText();
-      if (!/6,389|6389/.test(txt)) {
-        fail(where, `the spread note does not carry the total: "${txt.slice(0, 80)}"`);
+      // Against the block's own `data-total`, never a literal. A hardcoded
+      // 6,389 passed here and failed on CI, which rebuilds the database from
+      // the committed CSVs and got 6,387: the check was asserting one
+      // machine's data rather than that the words and the drawing agree.
+      const total = spread?.blocks?.[0]?.total;
+      const digits = (txt.match(/[\d][\d\s,.\u00a0\u202f]*/g) ?? []).map((g) =>
+        Number(g.replace(/[^\d]/g, ''))
+      );
+      if (total && !digits.includes(total)) {
+        fail(
+          where,
+          `the spread note says ${digits.join('/')} but the block carries ${total}: ` +
+            `"${txt.slice(0, 70)}"`
+        );
       }
       said = true;
       break;
