@@ -159,8 +159,11 @@ The project implements a dimensional model for time-series analysis:
   freguesia — by point when confidence is high/medium, else by the register's
   locality name, else by a rough point, else municipality only, else unplaced.
   Nothing is dropped: `tests/no_registration_is_dropped.sql`.
-- **Points are never published.** They are personal data (many ALs are homes).
-  The site shows area counts only; do not export the cache or `al.geom`.
+- **Points are published in one place only**: the standalone Madeira map
+  (`scripts/build_madeira_map.py`, deployed unlinked at `/al-pulse/madeira-map/`)
+  shows each property's point and register record — and nothing about its
+  operator (an allowlist in the script enforces it). Every other page shows
+  area counts only; do not export the cache or `al.geom` anywhere else.
 - **Export Formats**: GeoJSON, Shapefile, GeoParquet
 
 
