@@ -8,7 +8,8 @@
 --
 -- In order of trust:
 --   point       a geocoded point good to about a kilometre or better
---               (geocode_confidence high or medium), placed by polygon;
+--               (geocode_confidence high or medium), placed by polygon, and
+--               inside the municipality the register names;
 --   name        the register's own locality and municipality names, matched
 --               to OSM;
 --   rough_point a coarser geocoded point (a whole postcode area), by polygon;
@@ -32,7 +33,8 @@ geocoded AS (
 ),
 
 point_locality AS (
-    SELECT g.al_id, l.osm_id AS locality_osm_id, g.geocode_confidence
+    SELECT g.al_id, l.osm_id AS locality_osm_id, l.parent_id AS point_municipality_osm_id,
+           g.geocode_confidence
     FROM geocoded AS g
     INNER JOIN {{ ref('admin') }} AS l
         ON l.admin_type = 'locality' AND st_contains(l.geom, g.geom)
@@ -67,31 +69,54 @@ name_municipality AS (
     QUALIFY row_number() OVER (PARTITION BY li.al_id ORDER BY mm.osm_id) = 1
 ),
 
-chosen AS (
+-- A point is believed only if it lands in the municipality the register
+-- names (when the register's name matched one). The register gets its
+-- concelho right almost always; a point that disagrees is the geocoder's
+-- mistake — a misplaced address point, a street name shared by two places —
+-- not the register's. 170949/AL, registered in Calheta, was put in Ribeira
+-- Brava that way.
+checked AS (
     SELECT
         li.al_id,
-        CASE
-            WHEN pl.geocode_confidence IN ('high', 'medium') THEN pl.locality_osm_id
-            WHEN nl.locality_osm_id IS NOT null THEN nl.locality_osm_id
-            ELSE pl.locality_osm_id
-        END AS locality_osm_id,
-        CASE
-            WHEN pl.geocode_confidence IN ('high', 'medium') THEN 'point'
-            WHEN nl.locality_osm_id IS NOT null THEN 'name'
-            WHEN pl.locality_osm_id IS NOT null THEN 'rough_point'
-            WHEN nm.municipality_osm_id IS NOT null THEN 'municipality'
-            ELSE 'unplaced'
-        END AS placement_method,
-        nm.municipality_osm_id AS named_municipality_osm_id
+        pl.locality_osm_id AS point_locality_osm_id,
+        pl.geocode_confidence,
+        nl.locality_osm_id AS name_locality_osm_id,
+        nm.municipality_osm_id AS named_municipality_osm_id,
+        pl.locality_osm_id IS NOT null
+            AND (nm.municipality_osm_id IS null
+                 OR pl.point_municipality_osm_id = nm.municipality_osm_id)
+            AS point_agrees
     FROM listings AS li
     LEFT JOIN point_locality AS pl ON li.al_id = pl.al_id
     LEFT JOIN name_locality AS nl ON li.al_id = nl.al_id
     LEFT JOIN name_municipality AS nm ON li.al_id = nm.al_id
+),
+
+chosen AS (
+    SELECT
+        al_id,
+        CASE
+            WHEN point_agrees AND geocode_confidence IN ('high', 'medium')
+                THEN point_locality_osm_id
+            WHEN name_locality_osm_id IS NOT null THEN name_locality_osm_id
+            WHEN point_agrees THEN point_locality_osm_id
+        END AS locality_osm_id,
+        CASE
+            WHEN point_agrees AND geocode_confidence IN ('high', 'medium') THEN 'point'
+            WHEN name_locality_osm_id IS NOT null THEN 'name'
+            WHEN point_agrees THEN 'rough_point'
+            WHEN named_municipality_osm_id IS NOT null THEN 'municipality'
+            ELSE 'unplaced'
+        END AS placement_method,
+        point_locality_osm_id IS NOT null AND NOT point_agrees AS point_rejected,
+        named_municipality_osm_id
+    FROM checked
 )
 
 SELECT
     c.al_id,
     c.placement_method,
+    c.point_rejected,
     l.name AS locality_name,
     l.osm_id AS locality_osm_id,
     m.name AS municipality_name,

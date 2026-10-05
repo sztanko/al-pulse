@@ -155,8 +155,12 @@ The project implements a dimensional model for time-series analysis:
   `confidence` and `precision_m`. Output is the committed cache
   `downloads/geocode/al_geocoded.csv.gz`; CI reads it and never geocodes.
   Only new or changed addresses are redone; bump `GEOCODER_VERSION` to redo all.
+  INE has misplaced points (~0.5%: e.g. one door stored twice, 26 km apart), so
+  points far from the rest of their postcode are dropped before matching, and a
+  door stored twice takes the copy nearest its street — never an average.
 - **Placement**: `models/marts/al_placement.sql` puts each registration in a
-  freguesia — by point when confidence is high/medium, else by the register's
+  freguesia — by point when confidence is high/medium *and* the point lies in
+  the municipality the register names (`point_rejected` otherwise), else by the register's
   locality name, else by a rough point, else municipality only, else unplaced.
   Nothing is dropped: `tests/no_registration_is_dropped.sql`.
 - **Points are published in one place only**: the standalone Madeira map

@@ -54,7 +54,9 @@ log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="==> %(message)s")
 
 # Bump when the rules change: every row geocoded by an older version is redone.
-GEOCODER_VERSION = 1
+GEOCODER_VERSION = 2
+# v2: drops INE points stranded far from the rest of their postcode, and picks
+# one door rather than averaging several (see drop_stranded_points).
 
 BNM_URL = (
     "https://data.openaddresses.io/cache/uploads/jeffdefacto/"
@@ -70,6 +72,10 @@ STREET_MATCH = 0.90
 # this many metres of its median: the same name twice in one area is two
 # streets, and picking one would be a guess presented as a match.
 STREET_CP4_MAX_SPREAD_M = 1500
+# A BNM point further than both of these from its postcode's median is taken
+# to be misplaced and dropped (drop_stranded_points).
+STRANDED_MIN_M = 2000
+STRANDED_SPREAD_FACTOR = 10
 # A house number is a point; the BNM places it at the building entrance.
 ADDRESS_PRECISION_M = 15
 
@@ -253,16 +259,21 @@ street_in_cp4 AS (
       AND (l.postcode IS NULL OR l.postcode NOT IN (SELECT postcode FROM postcodes))
     QUALIFY row_number() OVER (PARTITION BY l.al_id ORDER BY sim DESC) = 1
 ),
--- The door itself, on the matched street.
+-- The door itself, on the matched street. When the BNM has the same door more
+-- than once, take the copy nearest the street's middle rather than averaging:
+-- the average of two points can land where neither is.
 doors AS (
-    SELECT l.al_id, median(b.lat) AS lat, median(b.lng) AS lng
+    SELECT l.al_id, b.lat, b.lng
     FROM listings AS l
     JOIN street_in_cp7 AS s ON s.al_id = l.al_id AND s.sim >= {STREET_MATCH}
     JOIN bnm AS b
       ON b.postcode = l.postcode AND b.street_norm = s.street_norm
      AND b.house_num = l.house_num
     WHERE l.house_num IS NOT NULL
-    GROUP BY 1
+    QUALIFY row_number() OVER (
+        PARTITION BY l.al_id
+        ORDER BY power(b.lat - s.lat, 2) + power(b.lng - s.lng, 2)
+    ) = 1
 )
 SELECT
     l.al_id,
@@ -347,8 +358,50 @@ def load_bnm(con: duckdb.DuckDBPyConnection, path: Path) -> None:
         JOIN bnm_streets AS s ON b.street IS NOT DISTINCT FROM s.street
     """)
     con.execute("DROP TABLE bnm_raw")
+    drop_stranded_points(con)
     n = con.execute("SELECT count(*) FROM bnm").fetchone()[0]
     log.info(f"BNM: {n:,} address points")
+
+
+def drop_stranded_points(con: duckdb.DuckDBPyConnection) -> None:
+    """Remove BNM points that sit far from every other point of their postcode.
+
+    The BNM has misplaced points: 9370-161, Caminho Lombo Estrela 85 in
+    Calheta, appears twice — once on its street and once 26 km east near
+    Funchal. Averaging the two put a registration in Ribeira Brava, where
+    neither copy is. About 0.5% of points are like that.
+
+    A point is stranded when it is further from its postcode's median than
+    both STRANDED_MIN_M and STRANDED_SPREAD_FACTOR times the postcode's own
+    median distance — so a rural postcode that genuinely spans kilometres keeps
+    its outlying farms, and a town postcode loses only what is plainly wrong.
+    Postcodes with fewer than three points have no majority to judge by and
+    are left alone.
+    """
+    con.execute(f"""
+        CREATE TEMP TABLE bnm_spread AS
+        WITH centre AS (
+            SELECT postcode, median(lat) AS clat, median(lng) AS clng, count(*) AS n
+            FROM bnm GROUP BY 1
+        ),
+        dist AS (
+            SELECT b.rowid AS rid, b.postcode, c.n,
+                   111320 * sqrt(power(b.lat - c.clat, 2)
+                                 + power((b.lng - c.clng) * cos(radians(c.clat)), 2)) AS d
+            FROM bnm AS b JOIN centre AS c USING (postcode)
+        )
+        SELECT rid, d, n, median(d) OVER (PARTITION BY postcode) AS typical
+        FROM dist
+    """)
+    stranded = con.execute(f"""
+        DELETE FROM bnm WHERE rowid IN (
+            SELECT rid FROM bnm_spread
+            WHERE n >= 3
+              AND d > greatest({STRANDED_MIN_M}, {STRANDED_SPREAD_FACTOR} * typical)
+        )
+    """).fetchone()[0]
+    con.execute("DROP TABLE bnm_spread")
+    log.info(f"BNM: dropped {stranded:,} stranded points")
 
 
 def load_listings(con: duckdb.DuckDBPyConnection, al_dir: Path) -> int:
