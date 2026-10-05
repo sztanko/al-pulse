@@ -93,7 +93,10 @@ const share = (v: number | undefined) =>
     Recolhas até agora: {m.pulls.map((p) => dateShort(p.date)).join(' · ')}.
     Uma recolha feita nos primeiros dias de um mês fecha o mês anterior — a do
     dia 2 existe para ver o mês anterior completo — e as perdas que encontra
-    ficam registadas nesse mês.
+    ficam registadas nesse mês. Cada recolha fecha um mês anterior ao da
+    recolha seguinte: uma recolha a meio do mês seguida de outra no início do
+    mês seguinte fecha o mês anterior ao seu, para que esse mês tenha a sua
+    própria barra.
   </p>
 
   <h2>O que um «total» conta</h2>
