@@ -4,8 +4,10 @@
     )
 }}
 
--- Identifies AL listings that "lost their license" (present in month N but not in month N+1)
--- A lost license is attributed to the month when it first disappeared
+-- Identifies AL listings that "lost their license" (present in one pull but not in the next)
+-- A lost license is attributed to the month the first pull missing it *closes*
+-- (al_pulls.closes_month), not that pull's calendar month: the pull on
+-- 2 October reports September's losses.
 
 WITH all_timestamps AS (
     -- Get all distinct scrape timestamps and derive year-month
@@ -71,12 +73,14 @@ lost_licenses_with_details AS (
         al.locality,
         al.municipality,
         al.district,
-        strftime(ll.next_timestamp, '%Y-%m') AS lost_in_year_month,
+        pulls.closes_month AS lost_in_year_month,
         ll.next_timestamp AS lost_in_timestamp
     FROM al_in_next_month AS ll
     INNER JOIN {{ ref('stg_al_list') }} AS al
         ON ll.al_id = al.al_id
         AND ll.etl_timestamp = al.etl_timestamp
+    INNER JOIN {{ ref('al_pulls') }} AS pulls
+        ON ll.next_timestamp = pulls.etl_timestamp
     WHERE ll.lost_license = 1
 )
 

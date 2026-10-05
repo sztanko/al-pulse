@@ -57,6 +57,19 @@ latest AS (
     WHERE month_date = DATE_TRUNC('month', CURRENT_DATE)
 ),
 
+-- Two look-backs, because they answer different questions: three years is the
+-- long arc, twelve months is what the register is doing now.
+prev_12_months AS (
+    SELECT
+        area_slug,
+        direct_parent_slug,
+        ancestor_municipality_slug,
+        ancestor_region_slug,
+        al_count AS al_count_12_months_ago
+    FROM regional_monthly
+    WHERE month_date = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 month'
+),
+
 prev_year AS (
     SELECT
         area_name,
@@ -84,6 +97,8 @@ national AS (
         l.al_per_1000,
         l.rank_within_country,
         (l.al_count - p.al_count_prev_year) / NULLIF(p.al_count_prev_year, 0) AS al_count_growth_pcnt,
+        (l.al_count - p12.al_count_12_months_ago)
+            / NULLIF(p12.al_count_12_months_ago, 0) AS al_count_growth_12m_pcnt,
         (p.rank_prev_year - l.rank_within_country) AS rank_within_country_change,
         TRUE AS has_time_series
     FROM latest AS l
@@ -92,6 +107,12 @@ national AS (
         COALESCE(l.direct_parent_slug, '') = COALESCE(p.direct_parent_slug, '') AND
         COALESCE(l.ancestor_municipality_slug, '') = COALESCE(p.ancestor_municipality_slug, '') AND
         COALESCE(l.ancestor_region_slug, '') = COALESCE(p.ancestor_region_slug, '')
+    )
+    LEFT JOIN prev_12_months AS p12 ON (
+        l.area_slug = p12.area_slug AND
+        COALESCE(l.direct_parent_slug, '') = COALESCE(p12.direct_parent_slug, '') AND
+        COALESCE(l.ancestor_municipality_slug, '') = COALESCE(p12.ancestor_municipality_slug, '') AND
+        COALESCE(l.ancestor_region_slug, '') = COALESCE(p12.ancestor_region_slug, '')
     )
 ),
 
@@ -114,6 +135,7 @@ azores AS (
         a.al_per_1000,
         CAST(NULL AS BIGINT) AS rank_within_country,
         CAST(NULL AS DOUBLE) AS al_count_growth_pcnt,
+        CAST(NULL AS DOUBLE) AS al_count_growth_12m_pcnt,
         CAST(NULL AS BIGINT) AS rank_within_country_change,
         FALSE AS has_time_series
     FROM {{ ref('azores_area_stats') }} AS a

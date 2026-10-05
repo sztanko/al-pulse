@@ -12,14 +12,14 @@
  * wrong in one of them.
  */
 import Base from '../layouts/Base.astro';
-import { meta } from '../lib/data';
+import { gapRuns, meta } from '../lib/data';
 import { fmt } from '../lib/format';
 
 const m = meta();
 const f = fmt('pt');
-const { monthLabel, num0 } = f;
+const { monthLabel, num0, dateShort } = f;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const gaps = m.unobserved_months;
+const gaps = gapRuns();
 ---
 
 <Base
@@ -48,32 +48,47 @@ const gaps = m.unobserved_months;
     desses dois.
   </p>
 
-  <h2>O registo foi recolhido {num0(m.observed_months.length)} vezes</h2>
+  <h2>O registo foi recolhido {num0(m.pulls.length)} vezes</h2>
   <p>
     Esta é a ressalva mais importante de todas, e condiciona todos os gráficos
     de perdas. Um registo que desapareceu só pode ser detetado comparando duas
     recolhas consecutivas — pelo que o primeiro mês em que qualquer perda é
-    sequer visível é <strong>{monthLabel(m.loss_observable_from)}</strong>, um
-    mês depois da primeira recolha. Antes disso a série de perdas não é zero: é
-    desconhecida, e os gráficos deixam-na em branco em vez de desenharem uma
+    sequer visível é <strong>{monthLabel(m.loss_observable_from)}</strong>, o
+    mês fechado pela segunda recolha. Antes disso a série de perdas não é zero:
+    é desconhecida, e os gráficos deixam-na em branco em vez de desenharem uma
     linha plana a sugerir que nunca nada caducou.
   </p>
   {
     gaps.length > 0 && (
       <p>
-        Há também um intervalo. O registo não foi recolhido entre{' '}
-        <strong>{monthLabel(gaps[0]!)}</strong> e{' '}
-        <strong>{monthLabel(gaps[gaps.length - 1]!)}</strong> — {num0(gaps.length)} meses.
-        Todas as licenças que caducaram nessa janela são atribuídas a{' '}
-        {monthLabel(m.data_through)}, porque foi então que se viu pela primeira
-        vez que faltavam. A queda foi gradual; o gráfico mostra-a como um
-        degrau. Leia esse degrau como «foi isto que encontrámos da próxima vez
-        que olhámos», e não como um acontecimento desse mês.
+        {gaps.length === 1 ? 'Há também um intervalo' : `Há também ${num0(gaps.length)} intervalos`}.{' '}
+        {gaps.map((g) => (
+          <>
+            Nenhuma recolha fechou{' '}
+            {g.months === 1 ? (
+              <strong>{monthLabel(g.from)}</strong>
+            ) : (
+              <>
+                o período de <strong>{monthLabel(g.from)}</strong> a{' '}
+                <strong>{monthLabel(g.to)}</strong> ({num0(g.months)} meses)
+              </>
+            )},{' '}
+            pelo que todas as licenças que caducaram então são atribuídas a{' '}
+            {g.filedUnder ? monthLabel(g.filedUnder) : '—'}, o mês fechado pela
+            primeira recolha que deu pela sua falta.{' '}
+          </>
+        ))}
+        A queda foi gradual; o gráfico mostra-a como um degrau. Leia esse degrau
+        como «foi isto que encontrámos da próxima vez que olhámos», e não como
+        um acontecimento desse mês.
       </p>
     )
   }
   <p class="small faint">
-    Recolhas até agora: {m.observed_months.map(monthLabel).join(' · ')}.
+    Recolhas até agora: {m.pulls.map((p) => dateShort(p.date)).join(' · ')}.
+    Uma recolha feita nos primeiros dias de um mês fecha o mês anterior — a do
+    dia 2 existe para ver o mês anterior completo — e as perdas que encontra
+    ficam registadas nesse mês.
   </p>
 
   <h2>O que um «total» conta</h2>

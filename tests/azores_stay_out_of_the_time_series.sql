@@ -46,6 +46,7 @@ FROM {{ ref('area_summary') }} AS s
 INNER JOIN azores_areas AS az ON s.area_slug = az.slug
 WHERE
     s.al_count_growth_pcnt IS NOT NULL
+    OR s.al_count_growth_12m_pcnt IS NOT NULL
     OR s.rank_within_country IS NOT NULL
     OR s.rank_within_country_change IS NOT NULL
 

@@ -34,6 +34,11 @@ export interface Meta {
    * the pull before them was more than a month earlier. Only spans longer than
    * one month appear. */
   loss_spans: { month: string; since: string; months: number }[];
+  /** Every pull of the register, in order: the day it ran and the month it
+   * closes. A pull early in a month closes the month before, so two pulls can
+   * share a `closes` month — count these, not `observed_months`, for "how many
+   * times has the register been pulled". */
+  pulls: { date: string; closes: string }[];
   generated: string;
   data_through: string;
   counts: {
@@ -80,7 +85,10 @@ export interface AreaRow {
   inhabitants_per_al: number | null;
   al_per_1000: number | null;
   rank_within_country: number | null;
+  /** Growth over three years. */
   al_count_growth_pcnt: number | null;
+  /** Growth over the last twelve months. */
+  al_count_growth_12m_pcnt: number | null;
   rank_within_country_change: number | null;
   direct_parent_slug: string | null;
   ancestor_municipality_slug: string | null;
@@ -246,6 +254,37 @@ export const lossStartIndex = (): number => {
 export const unobservedIndices = (): number[] => {
   const ms = meta().months;
   return meta().unobserved_months.map((m) => ms.indexOf(m)).filter((i) => i >= 0);
+};
+
+/** Each unbroken run of unobserved months, with the month its losses are
+ * filed under: the first observed month after it. Not the last month of the
+ * axis — those coincide only until the next pull. There can be more than one
+ * run (a pull on the 8th closes its own month and leaves the one before it
+ * unobserved), so prose must not treat the first and last unobserved months
+ * as one gap. */
+export interface GapRun {
+  from: string;
+  to: string;
+  months: number;
+  filedUnder: string | null;
+}
+export const gapRuns = (): GapRun[] => {
+  const ms = meta().months;
+  const runs: GapRun[] = [];
+  let prev = -2;
+  for (const m of meta().unobserved_months) {
+    const i = ms.indexOf(m);
+    const run = runs[runs.length - 1];
+    if (run && i === prev + 1) {
+      run.to = m;
+      run.months += 1;
+    } else {
+      runs.push({ from: m, to: m, months: 1, filedUnder: null });
+    }
+    prev = i;
+  }
+  for (const r of runs) r.filedUnder = meta().observed_months.find((m) => m > r.to) ?? null;
+  return runs;
 };
 
 /** How many months each loss figure covers, one entry per month of the axis.

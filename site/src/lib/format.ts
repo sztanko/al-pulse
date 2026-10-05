@@ -48,6 +48,8 @@ export interface Fmt {
   monthLabel: (m: string) => string;
   /** "2026-09" → "Sep 2026" / "set 2026" */
   monthShort: (m: string) => string;
+  /** "2026-10-02" → "2 Oct 2026" / "2 out 2026" */
+  dateShort: (d: string) => string;
   /** Just the month name, for an axis that already shows the year. */
   monthName: (monthNumber: number) => string;
   delta: (v: number | null | undefined, band?: number) => { text: string; dir: Direction };
@@ -93,6 +95,11 @@ export function fmt(lang: Lang): Fmt {
     monthShort: (m) => {
       const [y = '', mm = ''] = m.split('-');
       return `${MONTHS_SHORT[lang][Number(mm) - 1] ?? mm} ${y}`.trim();
+    },
+
+    dateShort: (d) => {
+      const [y = '', mm = '', dd = ''] = d.split('-');
+      return `${Number(dd)} ${MONTHS_SHORT[lang][Number(mm) - 1] ?? mm} ${y}`.trim();
     },
 
     monthName: (n) => MONTHS_SHORT[lang][n - 1] ?? String(n),

@@ -1,12 +1,12 @@
 ---
 import Base from '../layouts/Base.astro';
-import { meta } from '../lib/data';
+import { gapRuns, meta } from '../lib/data';
 import { fmt } from '../lib/format';
 
 const m = meta();
-const { monthLabel } = fmt('en');
+const { monthLabel, dateShort } = fmt('en');
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const gaps = m.unobserved_months;
+const gaps = gapRuns();
 ---
 
 <Base
@@ -35,32 +35,47 @@ const gaps = m.unobserved_months;
     derived from those.
   </p>
 
-  <h2>The register has been pulled {m.observed_months.length} times</h2>
+  <h2>The register has been pulled {m.pulls.length} times</h2>
   <p>
     This is the single most important caveat, and it shapes every chart of
     losses. A registration that has gone can only be detected by comparing two
     consecutive pulls — so the first month any loss is visible at all is
-    <strong>{monthLabel(m.loss_observable_from)}</strong>, one month after the
-    first pull. Before that the loss series is not zero; it is unknown, and the
-    charts leave it blank rather than draw a flat line implying that nothing
+    <strong>{monthLabel(m.loss_observable_from)}</strong>, the month closed by
+    the second pull. Before that the loss series is not zero; it is unknown, and
+    the charts leave it blank rather than draw a flat line implying that nothing
     ever lapsed.
   </p>
   {
     gaps.length > 0 && (
       <p>
-        There is also a gap. The register was not pulled between{' '}
-        <strong>{monthLabel(gaps[0]!)}</strong> and{' '}
-        <strong>{monthLabel(gaps[gaps.length - 1]!)}</strong> — {gaps.length} months.
-        Every licence that lapsed in that window is attributed to{' '}
-        {monthLabel(m.data_through)}, because that is when it was first seen to
-        be missing. The decline was gradual; the chart shows it as a cliff. Read
-        the step as "this is what we found when we next looked", not as an event
-        in that month.
+        There {gaps.length === 1 ? 'is also a gap' : `are also ${gaps.length} gaps`}.{' '}
+        {gaps.map((g) => (
+          <>
+            No pull closed{' '}
+            {g.months === 1 ? (
+              <strong>{monthLabel(g.from)}</strong>
+            ) : (
+              <>
+                <strong>{monthLabel(g.from)}</strong> to{' '}
+                <strong>{monthLabel(g.to)}</strong> ({g.months} months)
+              </>
+            )},{' '}
+            so every licence that lapsed then is attributed to{' '}
+            {g.filedUnder ? monthLabel(g.filedUnder) : '—'}, the month closed by
+            the first pull that found it missing.{' '}
+          </>
+        ))}
+        The decline was gradual; the chart shows it as a cliff. Read the step
+        as "this is what we found when we next looked", not as an event in that
+        month.
       </p>
     )
   }
   <p class="small faint">
-    Pulls so far: {m.observed_months.map(monthLabel).join(' · ')}.
+    Pulls so far: {m.pulls.map((p) => dateShort(p.date)).join(' · ')}. A pull
+    in the first days of a month closes the month before it — the one on the
+    2nd is there to see the previous month complete — and the losses it finds
+    are filed under that earlier month.
   </p>
 
   <h2>What a "total" counts</h2>

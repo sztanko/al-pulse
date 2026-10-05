@@ -608,8 +608,8 @@ async function checkCombinedTimeline(browser) {
    * The two things that make it honest are both checked here, because both
    * are easy to break and neither shows up as an error: the block must be
    * wider than a month, and it must NOT be taller than a genuine one-month
-   * loss that is smaller than its total. September 2026 carries 6,389 over six
-   * months; February 2026 lost 6,471 in one. If the spread block is ever the
+   * loss that is smaller than its total. September 2026 carries ~6,600 over
+   * seven months; January 2026 lost ~6,500 in one. If the spread block is ever the
    * taller of the two, the average is not being taken and the chart is back to
    * claiming a catastrophe in September. */
   const spread = await page.evaluate(() => {
@@ -645,43 +645,49 @@ async function checkCombinedTimeline(browser) {
     };
   });
 
-  if (!spread || spread.blocks.length !== 1) {
-    fail(where, `expected 1 spread block, found ${spread?.blocks.length ?? 'none'}`);
+  // One block per stretch the register went unpulled for more than a month:
+  // the seven-month 2026 hole, and since losses are filed under the month a pull
+  // closes, also October 2025 (the 8 November pull closed November, not
+  // October). Every one of them must be drawn honestly, not just the first.
+  if (!spread || spread.blocks.length === 0) {
+    fail(where, `expected a spread block, found ${spread ? 0 : 'none'}`);
   } else {
-    const b = spread.blocks[0];
-    if (b.w < spread.widestPlain * 2) {
-      fail(where, `the spread block is ${b.w.toFixed(1)} wide, barely more than a month`);
-    }
-    if (b.h >= spread.tallestPlain) {
-      fail(
-        where,
-        `the spread block is ${b.h.toFixed(1)} tall against a one-month bar of ` +
-          `${spread.tallestPlain.toFixed(1)}: its total is not being averaged`
-      );
-    }
-    // That bound alone is too weak to trust: February 2026 lost 6,471 in one
-    // real month against September's 6,389 over six, so an unaveraged block
-    // would still squeak under it and the check would pass while the chart
-    // lied. So assert the arithmetic instead — recover the value-to-pixel
-    // scale from an ordinary monthly bar, and require the block's height to be
-    // its own total divided by its own span.
-    if (!(b.span > 1) || !(b.total > 0)) {
-      fail(where, `the spread block declares span=${b.span} total=${b.total}`);
-    } else if (!spread.scale) {
-      fail(where, 'no monthly bar to take the scale from');
-    } else {
-      const want = (b.total / b.span) * spread.scale;
-      if (Math.abs(b.h - want) > Math.max(0.5, want * 0.02)) {
+    const fill = spread.fill;
+    for (const b of spread.blocks) {
+      if (b.w < spread.widestPlain * 2) {
+        fail(where, `the spread block is ${b.w.toFixed(1)} wide, barely more than a month`);
+      }
+      if (b.h >= spread.tallestPlain) {
         fail(
           where,
-          `the spread block is ${b.h.toFixed(1)}px for ${b.total} over ${b.span} months; ` +
-            `the monthly average would be ${want.toFixed(1)}px`
+          `the spread block is ${b.h.toFixed(1)} tall against a one-month bar of ` +
+            `${spread.tallestPlain.toFixed(1)}: its total is not being averaged`
         );
       }
-    }
-    // It must not read as a run of ordinary bars.
-    if (!/url\(/.test(spread.fill)) {
-      fail(where, `the spread block is filled with ${spread.fill}, not the hatch`);
+      // That bound alone is too weak to trust: January 2026 lost ~6,500 in one
+      // real month against September's ~6,600 over seven, so an unaveraged block
+      // would still squeak under it and the check would pass while the chart
+      // lied. So assert the arithmetic instead — recover the value-to-pixel
+      // scale from an ordinary monthly bar, and require the block's height to be
+      // its own total divided by its own span.
+      if (!(b.span > 1) || !(b.total > 0)) {
+        fail(where, `the spread block declares span=${b.span} total=${b.total}`);
+      } else if (!spread.scale) {
+        fail(where, 'no monthly bar to take the scale from');
+      } else {
+        const want = (b.total / b.span) * spread.scale;
+        if (Math.abs(b.h - want) > Math.max(0.5, want * 0.02)) {
+          fail(
+            where,
+            `the spread block is ${b.h.toFixed(1)}px for ${b.total} over ${b.span} months; ` +
+              `the monthly average would be ${want.toFixed(1)}px`
+          );
+        }
+      }
+      // It must not read as a run of ordinary bars.
+      if (!/url\(/.test(fill)) {
+        fail(where, `the spread block is filled with ${fill}, not the hatch`);
+      }
     }
   }
 
@@ -704,14 +710,16 @@ async function checkCombinedTimeline(browser) {
       // 6,389 passed here and failed on CI, which rebuilds the database from
       // the committed CSVs and got 6,387: the check was asserting one
       // machine's data rather than that the words and the drawing agree.
-      const total = spread?.blocks?.[0]?.total;
+      // The pointer is near the right edge, so the note is for the latest
+      // block; it must carry that block's total, whichever block it is.
+      const totals = (spread?.blocks ?? []).map((b) => b.total);
       const digits = (txt.match(/[\d][\d\s,.\u00a0\u202f]*/g) ?? []).map((g) =>
         Number(g.replace(/[^\d]/g, ''))
       );
-      if (total && !digits.includes(total)) {
+      if (totals.length && !totals.some((t) => digits.includes(t))) {
         fail(
           where,
-          `the spread note says ${digits.join('/')} but the block carries ${total}: ` +
+          `the spread note says ${digits.join('/')} but the blocks carry ${totals.join('/')}: ` +
             `"${txt.slice(0, 70)}"`
         );
       }

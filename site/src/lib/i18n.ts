@@ -107,7 +107,7 @@ const DICT = {
   // ------------------------------------------------------------------ tables
   'table.area': entry({ en: 'Area', pt: 'Área' }),
   'table.al_count': entry({ en: 'AL count', pt: 'N.º de AL' }),
-  'table.growth': entry({ en: 'Growth, 3 yr', pt: 'Crescimento, 3 anos' }),
+  'table.growth': entry({ en: 'Growth, 12 mo', pt: 'Crescimento, 12 meses' }),
   'table.inhabitants': entry({ en: 'Inhabitants per AL', pt: 'Habitantes por AL' }),
   'table.rank': entry({ en: 'Rank', pt: 'Posição' }),
   'table.rank_change': entry({ en: 'Rank change', pt: 'Variação de posição' }),
@@ -335,6 +335,7 @@ const DICT = {
     pt: 'Portugal continental e Madeira, no registo nacional.',
   }),
   'home.m_over_three': entry({ en: 'over three years', pt: 'em três anos' }),
+  'home.m_over_twelve': entry({ en: 'over twelve months', pt: 'em doze meses' }),
   'home.m_azores': entry({ en: 'Azores, separate register', pt: 'Açores, registo separado' }),
   'home.m_azores_note': entry({
     en: '{municipalities} municipalities and {localities} localities. Counted here and on the map; absent from every chart.',
@@ -365,6 +366,10 @@ const DICT = {
   'home.p_gap': entry({
     en: 'The register was not pulled between {from} and {to}, so those months are blank rather than zero, and every loss found in that stretch is attributed to {at}.',
     pt: 'O registo não foi recolhido entre {from} e {to}, pelo que esses meses ficam em branco e não a zero, e todas as perdas encontradas nesse intervalo são atribuídas a {at}.',
+  }),
+  'home.p_gap_one': entry({
+    en: 'No pull closed {month}, so it is blank rather than zero, and its losses are attributed to {at}.',
+    pt: 'Nenhuma recolha fechou {month}, pelo que fica em branco e não a zero, e as suas perdas são atribuídas a {at}.',
   }),
   'home.cap_pulls': entry({
     en: '{n} pulls of the register so far, the first in {first}.',
@@ -414,6 +419,7 @@ const DICT = {
     pt: 'Menos significa mais denso: menos residentes por cada alojamento registado.',
   }),
   'area.over_three': entry({ en: 'over three years', pt: 'em três anos' }),
+  'area.over_twelve': entry({ en: 'over twelve months', pt: 'em doze meses' }),
   'area.not_ranked': entry({
     en: 'Not ranked: every rank here is computed inside the monthly series, and this area has none',
     pt: 'Sem posição: todas as posições aqui são calculadas dentro da série mensal, e esta área não tem série',
