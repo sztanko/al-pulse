@@ -7,6 +7,12 @@ const m = meta();
 const { monthLabel, dateShort } = fmt('en');
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const gaps = gapRuns();
+const P = m.placement;
+const G = P.by_geocode;
+const B = P.by_placement;
+const num = (v: number) => v.toLocaleString('en-GB');
+const share = (v: number | undefined) =>
+  `${(((v ?? 0) / Math.max(1, P.total)) * 100).toFixed(0)}%`;
 ---
 
 <Base
@@ -162,13 +168,40 @@ const gaps = gapRuns();
     to disk, and a test fails the build if they reappear.
   </p>
 
+  <h2>How national registrations are placed</h2>
+  <p>
+    The national register gives an address and a postcode but no coordinate.
+    Each registration is geocoded against INE's
+    {' '}<a href="https://dados.gov.pt/en/datasets/base-nacional-de-moradas/">Base Nacional de Moradas</a>,
+    about six million address points, and the rule that produced the point is
+    kept with it. Of the {num(P.total)} registrations on the register now:
+  </p>
+  <ul>
+    <li>{share(G.address)} matched to the door — same postcode, street and number;</li>
+    <li>{share((G.street ?? 0) + (G.street_cp4 ?? 0))} matched to the street, without the number;</li>
+    <li>{share(G.postcode)} only to the postcode, at the middle of its addresses;</li>
+    <li>{share((G.postcode_area ?? 0) + (G.none ?? 0))} to a whole postcode area, or not at all.</li>
+  </ul>
+  <p>
+    A registration is put in a freguesia by its point when that point is good
+    to about a kilometre or better, and otherwise by the locality the register
+    names. The point comes first because the register's own freguesia names are
+    often the pre-2013 ones or abbreviated past matching. INE's addresses were
+    last updated in 2019, so streets built since then fall back to the postcode.
+  </p>
+  <p>
+    The points are used only to choose an area. Nothing on this site shows
+    where an individual registration is: many are people's homes, and every
+    figure here is a count for an area.
+  </p>
+
   <h2>What is excluded</h2>
   <ul>
     <li>
-      <strong>Areas the geography cannot place.</strong> A registration whose
-      postcode resolves to no known locality is counted nationally but appears
-      in no area. The postcode reference data is a fixed snapshot, so postcodes
-      issued since then do not resolve.
+      <strong>Nothing, for want of a place.</strong> A registration that can be
+      matched only to its municipality — {num(B.municipality ?? 0)} now — counts
+      there and nationally but in no freguesia; one that matches nothing —
+      {' '}{num(B.unplaced ?? 0)} — counts nationally only.
     </li>
   </ul>
 
@@ -182,8 +215,8 @@ const gaps = gapRuns();
   <h2>Known open issues</h2>
   <ul>
     <li>
-      Roughly 800 registrations sit on postcodes absent from the reference data
-      and so are not placed on the map.
+      Registrations on streets newer than INE's 2019 addresses are placed by
+      postcode, which in the countryside can be kilometres wide.
     </li>
     <li>
       Losses in an unobserved month are attributed to the next pull, as above.

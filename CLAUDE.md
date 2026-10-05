@@ -9,7 +9,7 @@ This is a geospatial data analysis project focused on Portuguese AL (Alojamento 
 ## Core Architecture
 
 ### Data Pipeline Architecture
-- **Raw Data Sources**: AL listings, OSM admin boundaries, postal codes, census data
+- **Raw Data Sources**: AL listings, OSM admin boundaries, INE address points (for geocoding), census data
 - **Storage**: DuckDB database (`data/prod.duckdb`) with spatial extension
 - **Processing**: DBT models organized in staging → intermediate → marts layers  
 - **Visualization**: a bespoke static site in `site/` (Astro + React islands, hand-rolled SVG/canvas)
@@ -17,7 +17,7 @@ This is a geospatial data analysis project focused on Portuguese AL (Alojamento 
 
 ### DBT Model Structure
 - **Staging** (`models/staging/`): Ephemeral models for initial data cleaning
-- **Intermediate** (`models/intermediate/`): Ephemeral models for complex transformations, especially postcode processing
+- **Intermediate** (`models/intermediate/`): Ephemeral models for complex transformations, e.g. lost licences
 - **Marts** (`models/marts/`): Final materialized tables for analysis and reporting
 
 Key marts include:
@@ -101,7 +101,7 @@ Data is scraped using the `scripts/run_fetch.sh` script, which fetches AL data f
 
 There is no field in the source indicating that a property is not active anymore, We can only compare the data with the previous month and see which properties are not there anymore. This is why we fully re-fetch the data every month, to keep it up to date. It takes around an hour to do so and we want to make sure we do not overload the source servers, so we put some time.sleep() in the script.
 
-Geographical boundaries and postal code data is fetched once. All those scripts dealing with it, calculating hierarhchies, etc are not really used anymore, as the datasets they have generated are not changed anymore,
+Geographical boundaries are fetched once. All those scripts dealing with it, calculating hierarhchies, etc are not really used anymore, as the datasets they have generated are not changed anymore,
 
 in the DuckDB database. The data is then processed through DBT models to create a structured dataset for analysis.
 
@@ -149,7 +149,18 @@ The project implements a dimensional model for time-series analysis:
 
 - **Projection**: EPSG:3763 for mainland Portugal, Azores, and Madeira
 - **Admin Boundaries**: OSM data processed into GeoJSON format
-- **Postal Code Areas**: Voronoi polygons intersected with administrative boundaries
+- **Geocoding**: `scripts/geocode_al.py` gives every registration a point from
+  INE's Base Nacional de Moradas (CC BY 4.0, via OpenAddresses), with
+  `method` (address / street / street_cp4 / postcode / postcode_area / none),
+  `confidence` and `precision_m`. Output is the committed cache
+  `downloads/geocode/al_geocoded.csv.gz`; CI reads it and never geocodes.
+  Only new or changed addresses are redone; bump `GEOCODER_VERSION` to redo all.
+- **Placement**: `models/marts/al_placement.sql` puts each registration in a
+  freguesia — by point when confidence is high/medium, else by the register's
+  locality name, else by a rough point, else municipality only, else unplaced.
+  Nothing is dropped: `tests/no_registration_is_dropped.sql`.
+- **Points are never published.** They are personal data (many ALs are homes).
+  The site shows area counts only; do not export the cache or `al.geom`.
 - **Export Formats**: GeoJSON, Shapefile, GeoParquet
 
 

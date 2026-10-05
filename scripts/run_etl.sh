@@ -43,19 +43,14 @@ FROM read_csv_auto(
 );
 " "$DUCKDB_LOCATION"
 
-duckdb -c "
-CREATE TABLE IF NOT EXISTS postal_codes_raw AS
-SELECT * FROM read_csv_auto('$POSTAL_CODE_DATA/postal_codes_raw.csv.gz', header=True)
-" "$DUCKDB_LOCATION"
-
 gunzip -kf downloads/osm/admin.geojson.gz
 
 export DBT_PROFILES_DIR=./config
 export PYTHONPATH=`pwd`
 
-dbt seed 
-dbt run --select +postcodes_to_lookup
-python scripts/lookup_invalid_postcodes.py
-
+# Coordinates come from the committed cache (downloads/geocode), produced by
+# scripts/geocode_al.py in the monthly refresh. CI never geocodes: it does not
+# have, and does not need, the 600 MB address file the cache was built from.
+dbt seed
 dbt run
 echo "ETL process completed successfully."

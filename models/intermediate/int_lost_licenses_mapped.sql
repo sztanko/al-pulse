@@ -4,79 +4,22 @@
     )
 }}
 
--- Maps lost licenses to geographic areas (locality, municipality, region)
--- Uses the same mapping logic as the al model
-
-WITH lost_licenses AS (
-    -- real_postcode is resolved here for the same reason al_unmapped resolves
-    -- it: a listing's raw postal_code is often wrong, and `postcodes` carries
-    -- the corrected value. Mapping a lost licence by its raw postcode while
-    -- the al model maps the same listing by its corrected one is what let a
-    -- licence be subtracted from a locality that never counted it.
-    SELECT
-        ll.*,
-        ps.real_postcode
-    FROM {{ ref('int_lost_licenses') }} AS ll
-    LEFT JOIN {{ ref('postcodes') }} AS ps ON ll.postal_code = ps.postcode
-),
-
-name_mapping AS (
-    SELECT
-        ll.al_id,
-        l.osm_id AS locality_osm_id
-    FROM lost_licenses AS ll
-    INNER JOIN {{ ref('admin') }} AS l
-        ON
-            lower(strip_accents(ll.locality)) = lower(strip_accents(l.name))
-            AND l.admin_type = 'locality'
-            AND lower(strip_accents(ll.municipality)) = lower(strip_accents(l.parent_name))
-    INNER JOIN {{ ref('admin') }} AS mm
-        ON
-            lower(strip_accents(ll.municipality)) = lower(strip_accents(mm.name))
-            AND mm.admin_type = 'municipality'
-            AND lower(strip_accents(ll.district)) = lower(strip_accents(mm.parent_name))
-),
-
-postcode_mapping AS (
-    SELECT
-        ll.al_id,
-        coalesce(p.locality_id, ips.locality_osm_id) AS locality_id
-    FROM lost_licenses AS ll
-    LEFT JOIN
-        {{ ref('postcodes') }}
-            AS p
-        ON ll.real_postcode = p.postcode
-    LEFT JOIN {{ ref('invalid_postcode_similarities') }} AS ips ON ll.real_postcode = ips.postcode
-),
-
-consolidated_mapping AS (
-    SELECT
-        ll.al_id,
-        coalesce(nm.locality_osm_id, pm.locality_id) AS locality_osm_id
-    FROM lost_licenses AS ll
-    LEFT JOIN name_mapping AS nm ON ll.al_id = nm.al_id
-    LEFT JOIN postcode_mapping AS pm ON ll.al_id = pm.al_id
-),
-
-full_mapping AS (
-    SELECT
-        ll.*,
-        l.name AS locality_name,
-        l.osm_id AS locality_osm_id,
-        m.name AS municipality_name,
-        m.osm_id AS municipality_osm_id,
-        d.name AS region_name,
-        d.osm_id AS region_osm_id
-    FROM lost_licenses AS ll
-    LEFT JOIN consolidated_mapping AS cm ON ll.al_id = cm.al_id
-    LEFT JOIN {{ ref('admin') }} AS l ON cm.locality_osm_id = l.osm_id AND l.admin_type = 'locality'
-    LEFT JOIN {{ ref('admin') }} AS m ON l.parent_id = m.osm_id AND m.admin_type = 'municipality'
-    LEFT JOIN {{ ref('admin') }} AS d ON m.parent_id = d.osm_id AND d.admin_type = 'region'
-)
-
-SELECT * FROM full_mapping
+-- Places lost licences in areas with the same rule as the current stock
+-- (al_placement, keyed by registration), so a licence is only ever
+-- subtracted from the area that counted it.
+SELECT
+    ll.*,
+    p.placement_method,
+    p.locality_name,
+    p.locality_osm_id,
+    p.municipality_name,
+    p.municipality_osm_id,
+    p.region_name,
+    p.region_osm_id
+FROM {{ ref('int_lost_licenses') }} AS ll
+INNER JOIN {{ ref('al_placement') }} AS p ON ll.al_id = p.al_id
 WHERE
     -- The Azores keep their own register (see models/marts/azores_al.sql);
     -- this one is national and carries only a fraction of them.
-    region_osm_id != {{ var('azores_region_osm_id') }}
-    AND region_osm_id IS NOT null
+    p.region_osm_id IS DISTINCT FROM {{ var('azores_region_osm_id') }}
+    AND NOT (p.region_osm_id IS null AND ll.district = 'Açores')

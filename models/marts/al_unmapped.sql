@@ -6,7 +6,8 @@
     )
 }}
 
--- This is a list of AL-s, but without mapping to 
+-- Every registration, with its geocoded point, before it is placed in an
+-- area (al_placement does that, and al joins the two).
 
 
 WITH last_etl AS (
@@ -46,8 +47,9 @@ latest_data AS (
 
 SELECT
     ld.*,
-    ps.geom,
-    ps.real_postcode
+    g.geom,
+    g.geocode_method,
+    g.geocode_confidence,
+    g.geocode_precision_m
 FROM latest_data AS ld
-LEFT JOIN {{ ref('postcodes') }} AS ps
-    ON ld.postal_code = ps.postcode
+LEFT JOIN {{ ref('stg_al_geocoded') }} AS g ON ld.al_id = g.al_id

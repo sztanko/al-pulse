@@ -6,7 +6,7 @@
       This mirrors `fold()` in scripts/azores_cleansing.py exactly, and the two
       have to stay in step — the Python side decides which values are *distinct*
       when deduplicating, and this side decides which ones *join*. The existing
-      joins in al.sql and invalid_postcode_similarities.sql use bare
+      joins in al_placement.sql use bare
       `lower(strip_accents(...))`, which is the same thing without the
       punctuation step; the Azorean register needs the extra step because it
       carries values like `São Mateus (Calheta)` against OSM's

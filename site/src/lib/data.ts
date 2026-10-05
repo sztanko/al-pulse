@@ -39,6 +39,14 @@ export interface Meta {
    * share a `closes` month — count these, not `observed_months`, for "how many
    * times has the register been pulled". */
   pulls: { date: string; closes: string }[];
+  /** How the current national register was geocoded and placed, as counts
+   * of registrations. Keys are the `geocode_method` and `placement_method`
+   * values from scripts/geocode_al.py and models/marts/al_placement.sql. */
+  placement: {
+    total: number;
+    by_placement: Record<string, number>;
+    by_geocode: Record<string, number>;
+  };
   generated: string;
   data_through: string;
   counts: {

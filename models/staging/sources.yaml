@@ -15,20 +15,14 @@ sources:
           monthly pulls in downloads/azores, with the pull timestamp parsed
           from each filename. Carries no registration dates - see
           models/staging/stg_azores_al.sql.
-      - name: postal_codes_raw
+      - name: al_geocoded
         description: |
-          Contains raw data on postcodes
-        external_location: "downloads/postal_code/postal_codes_raw.csv.gz"
-      - name: postal_code_lookup
-        description: |
-          Additionally looked up postal codes
+          A coordinate for every registration ever seen, with how it was
+          found (scripts/geocode_al.py, against INE's Base Nacional de Moradas,
+          CC BY 4.0). Committed so CI can build without the address file.
+          Input only: the site never publishes a point.
         config:
-          external_location: "downloads/postal_code/postal_code_lookup.csv"
-      - name: postal_code_invalid
-        description: |
-          Contains invalid postal codes
-        config:
-          external_location: "downloads/postal_code/invalid_postal_codes.csv"
+          external_location: "downloads/geocode/al_geocoded.csv.gz"
   - name: geojson
     tables:
       - name: admin

@@ -225,6 +225,28 @@ def fetch_pulls(con: duckdb.DuckDBPyConnection) -> list[dict]:
         """)
 
 
+def fetch_placement(con: duckdb.DuckDBPyConnection) -> dict:
+    """How the current register was geocoded and placed, as counts.
+
+    The method page quotes these rather than a typed number, which is how it
+    came to say "roughly 800" unplaced while 4,246 were being dropped.
+    Counts only: no point, address or registration number leaves the database.
+    """
+    def counts(col: str) -> dict[str, int]:
+        return {
+            str(k): int(v)
+            for k, v in con.execute(
+                f"SELECT {col}, count(*) FROM al WHERE is_active GROUP BY 1"
+            ).fetchall()
+        }
+
+    return {
+        "total": int(con.execute("SELECT count(*) FROM al WHERE is_active").fetchone()[0]),
+        "by_placement": counts("placement_method"),
+        "by_geocode": counts("coalesce(geocode_method, 'none')"),
+    }
+
+
 def fetch_events(con: duckdb.DuckDBPyConnection) -> list[dict]:
     """Policy events annotated onto the timelines. '#'-prefixed ones are hidden."""
     return rows_as_dicts(con, """
@@ -320,6 +342,7 @@ def build_meta(
     areas: list[dict],
     observed: list[str],
     pulls: list[dict],
+    placement: dict,
     azores_total: int,
     azores_in_rnal: int,
 ) -> dict:
@@ -372,6 +395,7 @@ def build_meta(
         "unobserved_months": unobserved,
         "loss_spans": spans,
         "pulls": pulls,
+        "placement": placement,
         "generated": date.today().isoformat(),
         "data_through": axis[-1],
         "counts": {
@@ -501,6 +525,7 @@ def main(
     map_rows = fetch_map_features(con)
     observed = fetch_observed_months(con)
     pulls = fetch_pulls(con)
+    placement = fetch_placement(con)
     azores_total, azores_in_rnal = fetch_azores_counts(con)
 
     by_id = {int(a["id"]): a for a in areas}
@@ -519,7 +544,7 @@ def main(
     total = 0
     total += write_json(
         out / "meta.json",
-        build_meta(axis, areas, observed, pulls, azores_total, azores_in_rnal),
+        build_meta(axis, areas, observed, pulls, placement, azores_total, azores_in_rnal),
     )
     total += write_json(
         out / "country.json",

@@ -2,7 +2,6 @@
 
 INPUT_DIR="downloads"
 AL_DATA="$INPUT_DIR/al"
-POSTAL_CODE_DATA="$INPUT_DIR/postal_code"
 echo "Running fetch..."
 
 pip install -r requirements.txt

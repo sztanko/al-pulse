@@ -11,8 +11,8 @@ This module is the record-level half of the cleansing. It is deliberately
 Anything needing the administrative hierarchy — which freguesia a point falls
 in, whether a concelho exists — is resolved in dbt against `admin`, where the
 OSM geometry and the parent/child relationships already live, and where the
-project already resolves postcodes the same way (`invalid_postcode_similarities`
-falls back to `st_contains`). Splitting it there keeps this file free of a
+project already places national registrations the same way (`al_placement`
+puts geocoded points in freguesias with `st_contains`). Splitting it there keeps this file free of a
 geometry dependency and keeps the relational work in SQL.
 
 Two properties matter more than the individual rules:
