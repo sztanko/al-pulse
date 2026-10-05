@@ -240,7 +240,7 @@ const lastMonth = f.monthLabel(m.data_through);
       {
         t(lang, 'home.cap_pulls', {
           n: f.num0(m.pulls.length),
-          first: f.monthLabel(m.observed_months[0]!),
+          first: f.monthLabel(m.pulls[0]!.date.slice(0, 7)),
         })
       }
     </figcaption>

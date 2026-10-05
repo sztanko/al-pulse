@@ -81,7 +81,9 @@ const share = (v: number | undefined) =>
     Pulls so far: {m.pulls.map((p) => dateShort(p.date)).join(' · ')}. A pull
     in the first days of a month closes the month before it — the one on the
     2nd is there to see the previous month complete — and the losses it finds
-    are filed under that earlier month.
+    are filed under that earlier month. Each pull closes a month before the
+    next pull's: a mid-month pull followed by an early one in the next month
+    closes the month before its own, so that month keeps a bar of its own.
   </p>
 
   <h2>What a "total" counts</h2>

@@ -608,8 +608,8 @@ async function checkCombinedTimeline(browser) {
    * The two things that make it honest are both checked here, because both
    * are easy to break and neither shows up as an error: the block must be
    * wider than a month, and it must NOT be taller than a genuine one-month
-   * loss that is smaller than its total. September 2026 carries ~6,600 over
-   * seven months; January 2026 lost ~6,500 in one. If the spread block is ever the
+   * loss that is smaller than its total. August 2026 carries ~6,000 over six
+   * months; January 2026 lost ~6,500 in one. If the spread block is ever the
    * taller of the two, the average is not being taken and the chart is back to
    * claiming a catastrophe in September. */
   const spread = await page.evaluate(() => {
@@ -646,9 +646,8 @@ async function checkCombinedTimeline(browser) {
   });
 
   // One block per stretch the register went unpulled for more than a month:
-  // the seven-month 2026 hole, and since losses are filed under the month a pull
-  // closes, also October 2025 (the 8 November pull closed November, not
-  // October). Every one of them must be drawn honestly, not just the first.
+  // today only the six-month 2026 hole (al_pulls gives every pull a month of
+  // its own, so short gaps close up). Every one must be drawn honestly.
   if (!spread || spread.blocks.length === 0) {
     fail(where, `expected a spread block, found ${spread ? 0 : 'none'}`);
   } else {
@@ -665,7 +664,7 @@ async function checkCombinedTimeline(browser) {
         );
       }
       // That bound alone is too weak to trust: January 2026 lost ~6,500 in one
-      // real month against September's ~6,600 over seven, so an unaveraged block
+      // real month against August's ~6,000 over six, so an unaveraged block
       // would still squeak under it and the check would pass while the chart
       // lied. So assert the arithmetic instead — recover the value-to-pixel
       // scale from an ordinary monthly bar, and require the block's height to be
