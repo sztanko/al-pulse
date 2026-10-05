@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from pathlib import Path
 
 import duckdb
@@ -101,6 +102,13 @@ def fetch_rows(con: duckdb.DuckDBPyConnection) -> list[dict]:
             al.placement_method,
             al.locality_name,
             al.municipality_name,
+            al.house_type,
+            al.rooms,
+            al.beds,
+            al.max_guests,
+            al.registration_date,
+            al.opening_date,
+            al.is_building_post_1951,
             raw.*
         FROM al
         JOIN raw USING (al_id)
@@ -124,7 +132,29 @@ def is_precise(row: dict) -> bool:
     return row["geocode_method"] in ("address", "street", "street_cp4")
 
 
+def decimal_year(d) -> float | None:
+    """2019-07-16 → 2019.54: a date on a scale a slider and a colour ramp can
+    use directly."""
+    if d is None:
+        return None
+    return round(d.year + (d.timetuple().tm_yday - 1) / 365.25, 3)
+
+
+def search_key(*parts) -> str:
+    """Lower-case, accent-free text the page's search box matches against."""
+    text = " ".join(str(p) for p in parts if p)
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(c)
+    )
+
+
+def yes_no(v) -> str | None:
+    return None if v is None else ("Yes" if v else "No")
+
+
 def to_points(rows: list[dict]) -> dict:
+    """What the map draws, filters and colours by — one flat property set per
+    point, every field the page offers as a filter or an encoding."""
     return {
         "type": "FeatureCollection",
         "features": [
@@ -133,8 +163,18 @@ def to_points(rows: list[dict]) -> dict:
                 "geometry": {"type": "Point", "coordinates": [round(r["lng"], 6), round(r["lat"], 6)]},
                 "properties": {
                     "id": r["al_id"],
+                    "q": search_key(r["f0"], r["f1"]),
                     "active": bool(r["is_active"]),
                     "precise": is_precise(r),
+                    "type": r["house_type"],
+                    "concelho": r["municipality_name"],
+                    "b1951": yes_no(r["is_building_post_1951"]),
+                    "rooms": r["rooms"],
+                    "beds": r["beds"],
+                    "guests": r["max_guests"],
+                    "registered": decimal_year(r["registration_date"]),
+                    "opened": decimal_year(r["opening_date"]),
+                    "precision": r["geocode_precision_m"],
                 },
             }
             for r in rows
@@ -142,12 +182,22 @@ def to_points(rows: list[dict]) -> dict:
     }
 
 
+def display(col: str, value):
+    """The register's codes, in words. 'Imóvel posterior a 1951' is S/N —
+    Sim/Não, i.e. whether the building postdates 1951 — and reads as Yes/No."""
+    if col == "Imóvel posterior a 1951":
+        return {"S": "Yes", "N": "No"}.get(str(value).strip().upper(), value)
+    return value
+
+
 def to_details(rows: list[dict]) -> dict:
     """id → ordered [label, value] sections, ready to render as-is."""
     out = {}
     for r in rows:
         register = [
-            [label, r[f"f{i}"]] for i, (_, label) in enumerate(RAW_FIELDS) if r[f"f{i}"]
+            [label, display(col, r[f"f{i}"])]
+            for i, (col, label) in enumerate(RAW_FIELDS)
+            if r[f"f{i}"]
         ]
         status = [
             ["Status", "On the register" if r["is_active"] else "No longer on the register"],
@@ -164,7 +214,12 @@ def to_details(rows: list[dict]) -> dict:
         ]
         out[r["al_id"]] = {
             "title": r["f0"] or r["al_id"],
+            "registration": r["f1"],
             "active": bool(r["is_active"]),
+            # The geocoded point itself: the map may fan points out from a
+            # shared spot, and links must use where the property is.
+            "lat": round(r["lat"], 6),
+            "lng": round(r["lng"], 6),
             "sections": [
                 ["Register", register],
                 ["Status", status],

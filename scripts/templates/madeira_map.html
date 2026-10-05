@@ -19,8 +19,7 @@
     --ink-soft: #5c5b55;
     --ink-faint: #8a897f;
     --rule: #e4e3dc;
-    --on: #2a78d6;      /* categorical slot 1 — on the register */
-    --off: #eb6834;     /* categorical slot 2 — no longer on it  */
+    --bar: #b9b8ae;
     --radius: 10px;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   }
@@ -28,83 +27,164 @@
   body { color: var(--ink); background: var(--surface); }
 
   .panel {
-    position: absolute; top: 12px; left: 12px; z-index: 2;
-    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    position: absolute; top: 12px; left: 12px; bottom: 12px; z-index: 2;
+    width: 292px; display: flex; flex-direction: column;
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
     backdrop-filter: blur(6px);
     border: 1px solid var(--rule); border-radius: var(--radius);
-    padding: 12px 14px 10px; width: 250px;
     box-shadow: 0 6px 24px rgb(0 0 0 / 0.08);
   }
-  .panel h1 { font-size: 15px; margin: 0 0 2px; font-weight: 650; letter-spacing: -0.01em; }
-  .panel .sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 10px; }
-  .panel fieldset { border: 0; padding: 0; margin: 0 0 8px; }
-  .panel legend { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-                  color: var(--ink-faint); margin-bottom: 4px; }
-  .panel label { display: flex; align-items: center; gap: 8px; font-size: 13px;
-                 padding: 3px 0; cursor: pointer; }
-  .panel label .n { margin-left: auto; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-  .panel input { margin: 0; accent-color: var(--ink-soft); }
-  .sw { width: 12px; height: 12px; border-radius: 50%; flex: none; box-sizing: border-box; }
-  .sw.on { background: var(--on); } .sw.off { background: var(--off); }
-  .sw.solid { background: var(--ink-soft); } .sw.ring { border: 2px solid var(--ink-soft); }
-  .panel .note { font-size: 11px; color: var(--ink-faint); margin: 6px 0 0; line-height: 1.4; }
-
-  .maplibregl-popup-content {
-    padding: 0; border-radius: var(--radius); box-shadow: 0 8px 28px rgb(0 0 0 / 0.16);
-    font-size: 12.5px; color: var(--ink);
+  .panel.closed { bottom: auto; }
+  .panel.closed .body { display: none; }
+  .head { padding: 12px 14px 10px; border-bottom: 1px solid var(--rule); }
+  .head h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: -0.01em;
+             display: flex; align-items: center; gap: 8px; }
+  .head h1 button { margin-left: auto; border: 1px solid var(--rule); background: var(--surface);
+                    border-radius: 6px; font: inherit; font-size: 12px; font-weight: 500;
+                    padding: 2px 8px; cursor: pointer; color: var(--ink-soft); }
+  .head .sub { font-size: 12px; color: var(--ink-soft); margin: 3px 0 0; font-variant-numeric: tabular-nums; }
+  .body { overflow: auto; padding: 4px 14px 14px; }
+  .sec { padding: 10px 0 8px; border-bottom: 1px solid var(--rule); }
+  .sec:last-child { border-bottom: 0; }
+  .sec > h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em;
+              color: var(--ink-faint); margin: 0 0 6px; font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2px 0; }
+  .row label { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0; }
+  .row .n { margin-left: auto; color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .row input[type=checkbox] { margin: 0; accent-color: var(--ink-soft); }
+  input[type=search], select {
+    width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 7px; padding: 6px 8px; background: #fff;
   }
-  .pop { width: 300px; max-height: min(60vh, 460px); overflow: auto; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .two label { font-size: 11.5px; color: var(--ink-soft); display: block; margin-bottom: 3px; }
+  .sw { width: 11px; height: 11px; border-radius: 50%; flex: none; box-sizing: border-box; }
+  .sw.ring { border: 2px solid var(--ink-soft); background: transparent; }
+  .sw.solid { background: var(--ink-soft); }
+
+  /* Legend */
+  .legend { margin-top: 8px; }
+  .legend .grad { height: 10px; border-radius: 3px; }
+  .legend .ticks { display: flex; justify-content: space-between; font-size: 11px;
+                   color: var(--ink-soft); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .legend .nodata { margin-top: 6px; }
+
+  /* Range filters: a histogram of every point, the selected span in ink. */
+  .range { padding: 6px 0 4px; }
+  .range .lab { display: flex; font-size: 12.5px; margin-bottom: 2px; }
+  .range .lab b { font-weight: 500; }
+  .range .lab span { margin-left: auto; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .range svg { display: block; width: 100%; height: 30px; }
+  .range svg rect { fill: var(--rule); }
+  .range svg rect.in { fill: var(--bar); }
+  .dual { position: relative; height: 18px; }
+  .dual input { position: absolute; left: 0; right: 0; width: 100%; margin: 0; top: 2px;
+                pointer-events: none; background: none; -webkit-appearance: none; appearance: none; height: 14px; }
+  .dual input::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 14px; height: 14px;
+                border-radius: 50%; background: #fff; border: 2px solid var(--ink-soft); cursor: pointer; }
+  .dual input::-moz-range-thumb { pointer-events: auto; width: 12px; height: 12px; border-radius: 50%;
+                background: #fff; border: 2px solid var(--ink-soft); cursor: pointer; }
+  .dual::before { content: ""; position: absolute; left: 7px; right: 7px; top: 8px; height: 2px;
+                  background: var(--rule); border-radius: 1px; }
+  .reset { margin-top: 10px; width: 100%; border: 1px solid var(--rule); background: var(--surface);
+           border-radius: 7px; font: inherit; font-size: 12.5px; padding: 6px; cursor: pointer; color: var(--ink); }
+
+  /* Popup */
+  .maplibregl-popup-content { padding: 0; border-radius: var(--radius); box-shadow: 0 8px 28px rgb(0 0 0 / 0.16);
+                              font-size: 12.5px; color: var(--ink); }
+  .pop { width: 300px; max-height: min(60vh, 480px); overflow: auto; }
   .pop header { position: sticky; top: 0; background: var(--surface); padding: 10px 34px 8px 12px;
-                border-bottom: 1px solid var(--rule); }
+                border-bottom: 1px solid var(--rule); z-index: 1; }
   .pop h2 { font-size: 14px; margin: 0; font-weight: 650; line-height: 1.25; }
-  .pop .badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;
-                font-size: 11.5px; color: var(--ink-soft); }
-  .pop .nav { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px;
-              color: var(--ink-soft); }
+  .pop .badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--ink-soft); }
+  .pop .links { display: flex; gap: 10px; margin-top: 6px; font-size: 12px; }
+  .pop .links a { color: #1c5cab; text-decoration: none; }
+  .pop .links a:hover { text-decoration: underline; }
+  .pop .nav { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; color: var(--ink-soft); }
   .pop .nav button { border: 1px solid var(--rule); background: var(--surface); border-radius: 6px;
                      padding: 1px 8px; cursor: pointer; font: inherit; color: var(--ink); }
-  .pop .nav button:disabled { opacity: 0.4; cursor: default; }
   .pop section { padding: 8px 12px 4px; }
-  .pop h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
-            color: var(--ink-faint); margin: 0 0 4px; font-weight: 600; }
+  .pop h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); margin: 0 0 4px; font-weight: 600; }
   .pop dl { display: grid; grid-template-columns: 112px 1fr; gap: 3px 10px; margin: 0 0 6px; }
   .pop dt { color: var(--ink-soft); }
   .pop dd { margin: 0; overflow-wrap: anywhere; }
-  .maplibregl-popup-close-button { font-size: 18px; padding: 4px 10px; z-index: 1; }
+  .maplibregl-popup-close-button { font-size: 18px; padding: 4px 10px; z-index: 2; }
+
+  @media (max-width: 640px) {
+    .panel { width: auto; right: 12px; bottom: auto; max-height: 70vh; }
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<div class="panel" role="region" aria-label="Map key and filters">
-  <h1>Alojamento Local · Madeira</h1>
-  <p class="sub"><span id="shown">…</span> of <span id="total">…</span> registrations shown</p>
-  <fieldset>
-    <legend>Register</legend>
-    <label><input type="checkbox" data-f="on" checked><span class="sw on"></span>On the register<span class="n" id="n-on"></span></label>
-    <label><input type="checkbox" data-f="off" checked><span class="sw off"></span>No longer on it<span class="n" id="n-off"></span></label>
-  </fieldset>
-  <fieldset>
-    <legend>Location</legend>
-    <label><input type="checkbox" data-f="precise" checked><span class="sw solid"></span>Door or street<span class="n" id="n-precise"></span></label>
-    <label><input type="checkbox" data-f="approx" checked><span class="sw ring"></span>Postcode only<span class="n" id="n-approx"></span></label>
-  </fieldset>
-  <p class="note">A ring is the middle of a postcode, not the property. Click a point for the property's register record.</p>
-</div>
+<aside class="panel" id="panel" aria-label="Filters, colour and key">
+  <div class="head">
+    <h1>Alojamento Local · Madeira <button type="button" id="toggle" aria-expanded="true">Hide</button></h1>
+    <p class="sub"><b id="matching">…</b> of <span id="total">…</span> match the filters</p>
+  </div>
+  <div class="body">
+    <div class="sec">
+      <input type="search" id="q" placeholder="Name or AL number, e.g. 170949" aria-label="Search by name or AL number">
+    </div>
+    <div class="sec">
+      <h2>Show</h2>
+      <div class="two">
+        <div><label for="colourBy">Colour by</label><select id="colourBy"></select></div>
+        <div><label for="sizeBy">Size by</label><select id="sizeBy"></select></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="row" style="margin-top:6px"><span class="sw solid"></span>Door or street
+        <span class="sw ring" style="margin-left:10px"></span>Postcode only</div>
+    </div>
+    <div id="filters"></div>
+    <div class="sec">
+      <button type="button" class="reset" id="reset">Clear all filters</button>
+      <p style="font-size:11px;color:var(--ink-faint);margin:8px 0 0;line-height:1.4">
+        Points that do not match stay on the map, faded. Properties at the same
+        spot are fanned out around it. A ring is the middle of a postcode, not the property.
+      </p>
+    </div>
+  </div>
+</aside>
 
 <script>
-const ON = getComputedStyle(document.documentElement).getPropertyValue('--on').trim();
-const OFF = getComputedStyle(document.documentElement).getPropertyValue('--off').trim();
-const SURFACE = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
+// ------------------------------------------------------------------ palette
+// Categorical slots in fixed order (validated light palette); sequential is
+// one blue ramp, light to dark, starting no lighter than step 250 so the
+// smallest values still read against the basemap.
+const CAT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+const OTHER = '#8a897f';
+const NODATA = '#c9c8c0';
+const RAMP = ['#86b6ef', '#5598e7', '#2a78d6', '#1c5cab', '#104281', '#0d366b'];
+const SURFACE = '#fcfcfb';
+const FADED = 0.13;
 
-// Madeira and Porto Santo, with room to pan.
-const BOUNDS = [[-17.35, 32.55], [-16.2, 33.15]];
+// ------------------------------------------------------------------- fields
+// kind 'cat' → checkbox filter and categorical colour; 'num' → range slider
+// with a histogram, sequential colour and (if sizable) size.
+const FIELDS = [
+  { key: 'active', label: 'Register', kind: 'cat',
+    values: [[true, 'On the register'], [false, 'No longer on it']] },
+  { key: 'type', label: 'Type', kind: 'cat' },
+  { key: 'concelho', label: 'Concelho', kind: 'cat' },
+  { key: 'b1951', label: 'Built after 1951', kind: 'cat' },
+  { key: 'precise', label: 'Location', kind: 'cat',
+    values: [[true, 'Door or street'], [false, 'Postcode only']] },
+  { key: 'rooms', label: 'Rooms', kind: 'num', step: 1, sizable: true },
+  { key: 'beds', label: 'Beds', kind: 'num', step: 1, sizable: true },
+  { key: 'guests', label: 'Guests', kind: 'num', step: 1, sizable: true },
+  { key: 'registered', label: 'Registered', kind: 'num', step: 1 / 12, year: true },
+  { key: 'opened', label: 'Opened', kind: 'num', step: 1 / 12, year: true },
+];
+const byKey = Object.fromEntries(FIELDS.map((f) => [f.key, f]));
 
+// --------------------------------------------------------------------- map
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/positron',
-  bounds: BOUNDS,
-  fitBoundsOptions: { padding: { top: 40, bottom: 40, left: 280, right: 40 } },
+  bounds: [[-17.35, 32.55], [-16.2, 33.15]],
+  fitBoundsOptions: { padding: { top: 40, bottom: 40, left: 320, right: 40 } },
   maxBounds: [[-18.2, 32.2], [-15.6, 33.5]],
   attributionControl: false,
 });
@@ -116,100 +196,465 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-ri
 
 const details = fetch('details.json').then((r) => r.json());
 
-// Size follows zoom: specks over the whole island, a clickable dot at street
-// level. Exponential so the step from island to town is gentle.
-const RADIUS = ['interpolate', ['exponential', 1.6], ['zoom'],
-  8, 1.4, 10, 2.2, 12, 3.4, 14, 5.5, 16, 8.5, 18, 12];
-const COLOUR = ['case', ['get', 'active'], ON, OFF];
-
-const filters = { on: true, off: true, precise: true, approx: true };
-function statusFilter() {
-  const keep = [];
-  if (filters.on) keep.push(true);
-  if (filters.off) keep.push(false);
-  return ['in', ['get', 'active'], ['literal', keep]];
+// Dot radius by zoom: specks over the island, a clickable dot at street level.
+const ZOOM_R = [[8, 1.4], [10, 2.2], [12, 3.4], [14, 5.5], [16, 8.5], [18, 12]];
+function radiusAt(z) {
+  if (z <= ZOOM_R[0][0]) return ZOOM_R[0][1];
+  for (let i = 1; i < ZOOM_R.length; i++) {
+    const [z1, r1] = ZOOM_R[i];
+    if (z <= z1) {
+      const [z0, r0] = ZOOM_R[i - 1];
+      const t = (Math.pow(1.6, z - z0) - 1) / (Math.pow(1.6, z1 - z0) - 1);
+      return r0 + (r1 - r0) * t;
+    }
+  }
+  return ZOOM_R[ZOOM_R.length - 1][1];
 }
 
+// ------------------------------------------------------------------- state
+let features = [];
+const state = { q: '', colourBy: 'active', sizeBy: '', cats: {}, ranges: {} };
+const stats = {};
+
+const fmtNum = (v) => v.toLocaleString('en-GB');
+const fmtYear = (v) => {
+  const y = Math.floor(v);
+  const m = Math.min(11, Math.floor((v - y) * 12 + 1e-6));
+  return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]} ${y}`;
+};
+const fmtVal = (f, v) => (f.year ? fmtYear(v) : fmtNum(Math.round(v)));
+const quantile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))];
+
+function computeStats() {
+  for (const f of FIELDS) {
+    if (f.kind === 'cat') {
+      const counts = new Map();
+      for (const p of features) counts.set(p[f.key] ?? null, (counts.get(p[f.key] ?? null) || 0) + 1);
+      let values = f.values
+        ? f.values.map(([v, l]) => [v, l, counts.get(v) || 0])
+        : [...counts.entries()].filter(([v]) => v !== null).sort((a, b) => b[1] - a[1]).map(([v, n]) => [v, v, n]);
+      if (!f.values && counts.get(null)) values.push([null, 'Unknown', counts.get(null)]);
+      stats[f.key] = { values };
+    } else {
+      const vals = features.map((p) => p[f.key]).filter((v) => v !== null && v !== undefined).sort((a, b) => a - b);
+      const min = f.year ? Math.floor(vals[0]) : vals[0];
+      // The slider stops at the 99th percentile; its top position means "and
+      // above", so one 92-guest hostel does not squeeze everyone else into a
+      // sliver of the track.
+      let cap = f.year ? Math.ceil(vals[vals.length - 1]) : Math.max(min + 1, Math.ceil(quantile(vals, 0.99)));
+      const max = vals[vals.length - 1];
+      // Colour runs to the 95th percentile, clamped, labelled "or more".
+      const p95 = f.year ? max : Math.max(min + 1, quantile(vals, 0.95));
+      stats[f.key] = { vals, min, cap, max, p95, openTop: !f.year && max > cap };
+    }
+  }
+}
+
+// --------------------------------------------------------------- matching
+function matches(p) {
+  if (state.q) {
+    const q = state.q;
+    if (!p.q.includes(q) && !String(p.id).includes(q)) return false;
+  }
+  for (const f of FIELDS) {
+    if (f.kind === 'cat') {
+      const off = state.cats[f.key];
+      if (off && off.has(p[f.key] ?? null)) return false;
+    } else {
+      const r = state.ranges[f.key];
+      if (!r) continue;
+      const v = p[f.key];
+      if (v === null || v === undefined) return false;
+      const s = stats[f.key];
+      if (v < r[0]) return false;
+      if (v > r[1] && !(s.openTop && r[1] >= s.cap)) return false;
+    }
+  }
+  return true;
+}
+
+// Many properties share one spot — a building, or the middle of a postcode.
+// Fan each group out around its spot in a sunflower spiral, sized in screen
+// pixels so the spread is right at every zoom.
+const groups = new Map();
+function groupFeatures() {
+  for (const f of features) {
+    const k = f._lng + ',' + f._lat;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(f);
+  }
+  for (const g of groups.values()) g.sort((a, b) => (b._m - a._m) || String(a.id).localeCompare(String(b.id)));
+}
+const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+// Below street level a spread group would sprawl over its neighbours (and,
+// for a big postcode centre, out to sea), so groups only fan out from here.
+const FAN_FROM_ZOOM = 13;
+function geojson() {
+  const z = map.getZoom();
+  const fan = z >= FAN_FROM_ZOOM;
+  const spacing = radiusAt(z) * (state.sizeBy ? 3.2 : 2.3);
+  const degPerPx = 360 / (512 * Math.pow(2, z));
+  const out = [];
+  for (const g of groups.values()) {
+    g.forEach((f, k) => {
+      let lng = f._lng, lat = f._lat;
+      if (fan && g.length > 1) {
+        const r = spacing * 0.62 * Math.sqrt(k + (k ? 0.5 : 0));
+        const a = k * GOLDEN;
+        lng += Math.cos(a) * r * degPerPx;
+        lat += Math.sin(a) * r * degPerPx * Math.cos(lat * Math.PI / 180);
+      }
+      out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] }, properties: f });
+    });
+  }
+  return { type: 'FeatureCollection', features: out };
+}
+
+let pending = false;
+function refresh(regroup) {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    let n = 0;
+    for (const f of features) { f._m = matches(f) ? 1 : 0; n += f._m; }
+    if (regroup) for (const g of groups.values()) g.sort((a, b) => (b._m - a._m) || String(a.id).localeCompare(String(b.id)));
+    document.getElementById('matching').textContent = fmtNum(n);
+    map.getSource('al')?.setData(geojson());
+    drawHistograms();
+  });
+}
+
+// ----------------------------------------------------------------- styling
+function colourExpr() {
+  const f = byKey[state.colourBy];
+  const s = stats[f.key];
+  if (f.kind === 'cat') {
+    const vals = s.values.filter(([v]) => v !== null);
+    const named = vals.length > CAT.length ? vals.slice(0, CAT.length - 1) : vals;
+    const expr = ['match', ['to-string', ['get', f.key]]];
+    named.forEach(([v], i) => expr.push(String(v), CAT[i]));
+    expr.push(vals.length > named.length ? OTHER : NODATA);
+    return ['case', ['==', ['get', f.key], null], NODATA, expr];
+  }
+  const lo = s.min, hi = s.p95;
+  const stops = [];
+  RAMP.forEach((c, i) => stops.push(lo + (hi - lo) * (i / (RAMP.length - 1)), c));
+  return ['case', ['==', ['get', f.key], null], NODATA, ['interpolate', ['linear'], ['get', f.key], ...stops]];
+}
+
+function sizeFactor() {
+  if (!state.sizeBy) return 1;
+  const s = stats[state.sizeBy];
+  // Area, not radius, follows the value (square root), clamped at the 95th
+  // percentile; unknown values get the smallest dot.
+  return ['case', ['==', ['get', state.sizeBy], null], 0.7,
+    ['+', 0.7, ['*', 1.5, ['sqrt', ['/', ['min', ['max', ['-', ['get', state.sizeBy], s.min], 0], s.p95 - s.min], s.p95 - s.min]]]]];
+}
+
+function radiusExpr() {
+  const k = sizeFactor();
+  const e = ['interpolate', ['exponential', 1.6], ['zoom']];
+  for (const [z, r] of ZOOM_R) e.push(z, k === 1 ? r : ['*', r, k]);
+  return e;
+}
+
+function applyStyle() {
+  const colour = colourExpr();
+  const radius = radiusExpr();
+  const m = ['==', ['get', '_m'], 1];
+  map.setPaintProperty('precise', 'circle-color', colour);
+  map.setPaintProperty('precise', 'circle-radius', radius);
+  map.setPaintProperty('approx', 'circle-stroke-color', colour);
+  map.setPaintProperty('approx', 'circle-radius', radius);
+  map.setPaintProperty('precise', 'circle-opacity', ['case', m, 0.92, FADED]);
+  map.setPaintProperty('precise', 'circle-stroke-opacity', ['case', m, 1, FADED]);
+  map.setPaintProperty('approx', 'circle-stroke-opacity', ['case', m, 0.95, FADED]);
+  map.setPaintProperty('approx', 'circle-opacity', ['case', m, 0.6, FADED * 0.5]);
+  drawLegend();
+}
+
+function drawLegend() {
+  const f = byKey[state.colourBy];
+  const s = stats[f.key];
+  const el = document.getElementById('legend');
+  el.replaceChildren();
+  if (f.kind === 'cat') {
+    const vals = s.values.filter(([v]) => v !== null);
+    const named = vals.length > CAT.length ? vals.slice(0, CAT.length - 1) : vals;
+    named.forEach(([, label, n], i) => el.append(swatchRow(CAT[i], label, n)));
+    if (vals.length > named.length) {
+      el.append(swatchRow(OTHER, 'Other', vals.slice(named.length).reduce((a, v) => a + v[2], 0)));
+    }
+    const unknown = s.values.find(([v]) => v === null);
+    if (unknown) el.append(swatchRow(NODATA, 'Unknown', unknown[2]));
+  } else {
+    const g = document.createElement('div');
+    g.className = 'grad';
+    g.style.background = `linear-gradient(to right, ${RAMP.join(',')})`;
+    const t = document.createElement('div');
+    t.className = 'ticks';
+    const mid = (s.min + s.p95) / 2;
+    t.append(...[s.min, mid, s.p95].map((v, i) => {
+      const sp = document.createElement('span');
+      sp.textContent = fmtVal(f, v) + (i === 2 && s.max > s.p95 ? ' or more' : '');
+      return sp;
+    }));
+    el.append(g, t);
+    const nulls = features.filter((p) => p[f.key] === null || p[f.key] === undefined).length;
+    if (nulls) { const r = swatchRow(NODATA, 'Unknown', nulls); r.classList.add('nodata'); el.append(r); }
+  }
+  if (state.sizeBy) {
+    const f2 = byKey[state.sizeBy];
+    const s2 = stats[state.sizeBy];
+    const note = document.createElement('p');
+    note.style.cssText = 'font-size:11.5px;color:var(--ink-soft);margin:6px 0 0';
+    note.textContent = `Dot area grows with ${f2.label.toLowerCase()}, largest at ${fmtVal(f2, s2.p95)} or more.`;
+    el.append(note);
+  }
+}
+
+function swatchRow(colour, label, n) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const sw = document.createElement('span');
+  sw.className = 'sw';
+  sw.style.background = colour;
+  const l = document.createElement('span');
+  l.textContent = label;
+  const c = document.createElement('span');
+  c.className = 'n';
+  c.textContent = fmtNum(n);
+  row.append(sw, l, c);
+  return row;
+}
+
+// ----------------------------------------------------------------- filters
+const histos = [];
+function buildFilters() {
+  const root = document.getElementById('filters');
+  for (const f of FIELDS) {
+    const sec = document.createElement('div');
+    sec.className = 'sec';
+    const h = document.createElement('h2');
+    h.textContent = f.label;
+    sec.append(h);
+    if (f.kind === 'cat') {
+      for (const [v, label, n] of stats[f.key].values) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.field = f.key;
+        cb.addEventListener('change', () => {
+          const set = state.cats[f.key] || (state.cats[f.key] = new Set());
+          cb.checked ? set.delete(v) : set.add(v);
+          refresh(true);
+        });
+        const t = document.createElement('span');
+        t.textContent = label;
+        lab.append(cb, t);
+        const c = document.createElement('span');
+        c.className = 'n';
+        c.textContent = fmtNum(n);
+        row.append(lab, c);
+        sec.append(row);
+      }
+    } else {
+      sec.append(rangeControl(f));
+    }
+    root.append(sec);
+  }
+}
+
+function rangeControl(f) {
+  const s = stats[f.key];
+  const wrap = document.createElement('div');
+  wrap.className = 'range';
+  const lab = document.createElement('div');
+  lab.className = 'lab';
+  const b = document.createElement('b');
+  b.textContent = f.year ? 'Between' : 'From – to';
+  const val = document.createElement('span');
+  lab.append(b, val);
+
+  // One bin per integer (capped at 30 bins) or per year; the last bin of an
+  // open-topped field holds everything above the cap.
+  const lo = s.min, hi = s.cap;
+  const width = f.year ? 1 : Math.max(1, Math.ceil((hi - lo + 1) / 30));
+  const nb = Math.floor((hi - lo) / width) + 1;
+  const bins = new Array(nb).fill(0);
+  for (const v of s.vals) bins[Math.min(nb - 1, Math.floor((Math.min(v, hi) - lo) / width))]++;
+  const peak = Math.max(...bins);
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${nb * 10} 30`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  const rects = bins.map((n, i) => {
+    const r = document.createElementNS(svgNS, 'rect');
+    const h = n ? Math.max(1.5, Math.sqrt(n / peak) * 30) : 0;
+    r.setAttribute('x', i * 10 + 1); r.setAttribute('width', 8);
+    r.setAttribute('y', 30 - h); r.setAttribute('height', h);
+    const t = document.createElementNS(svgNS, 'title');
+    const from = lo + i * width, to = from + width - (f.year ? 0 : 1);
+    t.textContent = `${f.year ? from : (width > 1 ? from + '–' + to : from)}${i === nb - 1 && s.openTop ? '+' : ''}: ${fmtNum(n)}`;
+    r.append(t);
+    svg.append(r);
+    return { r, from: lo + i * width, to: lo + (i + 1) * width };
+  });
+
+  const dual = document.createElement('div');
+  dual.className = 'dual';
+  const a = document.createElement('input');
+  const z = document.createElement('input');
+  for (const [inp, v, name] of [[a, lo, 'minimum'], [z, hi, 'maximum']]) {
+    inp.type = 'range';
+    inp.min = lo; inp.max = hi; inp.step = f.step; inp.value = v;
+    inp.setAttribute('aria-label', `${f.label} ${name}`);
+    dual.append(inp);
+  }
+  const show = () => {
+    const x = +a.value, y = +z.value;
+    val.textContent = `${fmtVal(f, x)} – ${fmtVal(f, y)}${y >= hi && s.openTop ? '+' : ''}`;
+  };
+  const on = (which) => {
+    if (+a.value > +z.value) (which === a ? z : a).value = which.value;
+    const full = +a.value <= lo && +z.value >= hi;
+    state.ranges[f.key] = full ? null : [+a.value, +z.value];
+    show();
+    refresh(true);
+  };
+  a.addEventListener('input', () => on(a));
+  z.addEventListener('input', () => on(z));
+  show();
+  histos.push({ key: f.key, rects, a, z, show });
+  wrap.append(lab, svg, dual);
+  return wrap;
+}
+
+function drawHistograms() {
+  for (const h of histos) {
+    const x = +h.a.value, y = +h.z.value;
+    for (const { r, from, to } of h.rects) r.classList.toggle('in', to > x && from <= y);
+  }
+}
+
+function resetAll() {
+  state.q = '';
+  document.getElementById('q').value = '';
+  state.cats = {};
+  state.ranges = {};
+  document.querySelectorAll('#filters input[type=checkbox]').forEach((c) => (c.checked = true));
+  for (const h of histos) { h.a.value = h.a.min; h.z.value = h.z.max; h.show(); }
+  refresh(true);
+}
+
+function buildSelects() {
+  const cb = document.getElementById('colourBy');
+  const sb = document.getElementById('sizeBy');
+  for (const f of FIELDS) cb.append(new Option(f.label, f.key));
+  sb.append(new Option('Nothing', ''));
+  for (const f of FIELDS.filter((f) => f.sizable)) sb.append(new Option(f.label, f.key));
+  cb.value = state.colourBy;
+  cb.addEventListener('change', () => { state.colourBy = cb.value; applyStyle(); });
+  sb.addEventListener('change', () => { state.sizeBy = sb.value; applyStyle(); refresh(false); });
+}
+
+// ------------------------------------------------------------------- load
 map.on('load', async () => {
   const points = await fetch('points.geojson').then((r) => r.json());
-  map.addSource('al', { type: 'geojson', data: points });
+  features = points.features.map((f) => ({
+    ...f.properties, _lng: f.geometry.coordinates[0], _lat: f.geometry.coordinates[1], _m: 1,
+  }));
+  document.getElementById('total').textContent = fmtNum(features.length);
+  computeStats();
+  groupFeatures();
 
-  // Rings under dots: an approximate point never hides an exact one.
+  map.addSource('al', { type: 'geojson', data: geojson() });
+  // Rings under dots, and faded points under matching ones.
   map.addLayer({
     id: 'approx', type: 'circle', source: 'al',
-    filter: ['all', ['!', ['get', 'precise']], statusFilter()],
+    filter: ['!', ['get', 'precise']],
+    layout: { 'circle-sort-key': ['get', '_m'] },
     paint: {
-      'circle-radius': RADIUS,
       'circle-color': SURFACE,
-      'circle-opacity': 0.55,
-      'circle-stroke-color': COLOUR,
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 14, 1.6, 18, 2.2],
-      'circle-stroke-opacity': 0.9,
     },
   });
   map.addLayer({
     id: 'precise', type: 'circle', source: 'al',
-    filter: ['all', ['get', 'precise'], statusFilter()],
+    filter: ['get', 'precise'],
+    layout: { 'circle-sort-key': ['get', '_m'] },
     paint: {
-      'circle-radius': RADIUS,
-      'circle-color': COLOUR,
-      'circle-opacity': 0.9,
-      // A thin surface ring keeps overlapping dots countable.
+      // A thin surface ring keeps neighbouring dots countable.
       'circle-stroke-color': SURFACE,
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 0.3, 14, 1, 18, 1.5],
     },
   });
 
-  const feats = points.features.map((f) => f.properties);
-  const count = (p) => feats.filter(p).length;
-  const set = (id, n) => (document.getElementById(id).textContent = n.toLocaleString('en-GB'));
-  set('total', feats.length);
-  set('n-on', count((p) => p.active));
-  set('n-off', count((p) => !p.active));
-  set('n-precise', count((p) => p.precise));
-  set('n-approx', count((p) => !p.precise));
-  const refreshShown = () => set('shown', count((p) =>
-    (p.active ? filters.on : filters.off) && (p.precise ? filters.precise : filters.approx)));
-  refreshShown();
+  buildSelects();
+  buildFilters();
+  applyStyle();
+  refresh(false);
 
-  document.querySelectorAll('.panel input').forEach((el) => el.addEventListener('change', () => {
-    filters[el.dataset.f] = el.checked;
-    map.setFilter('precise', ['all', ['get', 'precise'], statusFilter()]);
-    map.setFilter('approx', ['all', ['!', ['get', 'precise']], statusFilter()]);
-    map.setLayoutProperty('precise', 'visibility', filters.precise ? 'visible' : 'none');
-    map.setLayoutProperty('approx', 'visibility', filters.approx ? 'visible' : 'none');
-    refreshShown();
-  }));
+  document.getElementById('q').addEventListener('input', (e) => {
+    state.q = e.target.value.trim().toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '');
+    refresh(true);
+  });
+  document.getElementById('reset').addEventListener('click', resetAll);
+  map.on('zoomend', () => refresh(false));
 
   for (const layer of ['precise', 'approx']) {
     map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
   }
-
-  // A click takes everything under a small box around the pointer, not just
-  // the top feature: many registrations share one building, or one postcode
-  // centre, and a popup showing one of them would hide the rest.
-  map.on('click', async (e) => {
-    const pad = 6;
-    const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
-    const hits = map.queryRenderedFeatures(box, { layers: ['precise', 'approx'] });
-    const ids = [...new Set(hits.map((h) => h.properties.id))];
-    if (!ids.length) return;
-    const all = await details;
-    const at = hits[0].geometry.coordinates;
-    const popup = new maplibregl.Popup({ maxWidth: 'none', offset: 10 }).setLngLat(at);
-    let i = 0;
-    const render = () => popup.setDOMContent(card(all[ids[i]], i, ids.length, (d) => {
-      i = (i + d + ids.length) % ids.length;
-      render();
-    }));
-    render();
-    popup.addTo(map);
-  });
+  map.on('click', onClick);
 });
 
-// Built with textContent throughout: every value comes from a public register
-// and is rendered as text, never as markup.
+document.getElementById('toggle').addEventListener('click', (e) => {
+  const p = document.getElementById('panel');
+  const closed = p.classList.toggle('closed');
+  e.target.textContent = closed ? 'Show' : 'Hide';
+  e.target.setAttribute('aria-expanded', String(!closed));
+});
+
+// ------------------------------------------------------------------- popup
+// Everything under a small box around the pointer, matching ones first: a
+// click near a fanned-out group should reach all of it.
+async function onClick(e) {
+  const pad = 6;
+  const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
+  const hits = map.queryRenderedFeatures(box, { layers: ['precise', 'approx'] });
+  if (!hits.length) return;
+  hits.sort((a, b) => b.properties._m - a.properties._m);
+  const ids = [...new Set(hits.map((h) => h.properties.id))];
+  const all = await details;
+  const popup = new maplibregl.Popup({ maxWidth: 'none', offset: 10 }).setLngLat(hits[0].geometry.coordinates);
+  let i = 0;
+  const render = () => popup.setDOMContent(card(all[ids[i]], i, ids.length, (d) => {
+    i = (i + d + ids.length) % ids.length;
+    render();
+  }));
+  render();
+  popup.addTo(map);
+  clearPanel(popup);
+}
+
+// The panel floats over the map, and a popup opened near it would be hidden
+// underneath: slide the map until the popup clears it.
+function clearPanel(popup) {
+  const panel = document.getElementById('panel').getBoundingClientRect();
+  const box = popup.getElement().getBoundingClientRect();
+  const overlap = panel.right + 12 - box.left;
+  const vertical = box.top < panel.bottom && box.bottom > panel.top;
+  if (overlap > 0 && vertical) map.panBy([-overlap, 0], { duration: 250 });
+}
+
+// textContent throughout: every value comes from a public register and is
+// rendered as text, never as markup.
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -217,20 +662,39 @@ function el(tag, cls, text) {
   return n;
 }
 
+function link(text, href) {
+  const a = el('a', null, text);
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  return a;
+}
+
 function card(d, i, n, step) {
   const root = el('div', 'pop');
   const head = el('header');
   head.append(el('h2', null, d.title));
   const badge = el('div', 'badge');
-  const sw = el('span', 'sw ' + (d.active ? 'on' : 'off'));
+  const sw = el('span', 'sw');
+  sw.style.background = d.active ? CAT[0] : CAT[1];
   badge.append(sw, document.createTextNode(d.active ? 'On the register' : 'No longer on the register'));
   head.append(badge);
+
+  const links = el('div', 'links');
+  const query = [d.title !== d.registration ? `"${d.title}"` : '', d.registration ? `"${d.registration}"` : '']
+    .filter(Boolean).join(' ');
+  links.append(
+    link('Search Google ↗', 'https://www.google.com/search?q=' + encodeURIComponent(query)),
+    link('Google Maps ↗', `https://www.google.com/maps/search/?api=1&query=${d.lat},${d.lng}`),
+  );
+  head.append(links);
+
   if (n > 1) {
     const nav = el('div', 'nav');
     const prev = el('button', null, '‹');
     const next = el('button', null, '›');
-    prev.setAttribute('aria-label', 'Previous registration here');
-    next.setAttribute('aria-label', 'Next registration here');
+    prev.setAttribute('aria-label', 'Previous property here');
+    next.setAttribute('aria-label', 'Next property here');
     prev.onclick = () => step(-1);
     next.onclick = () => step(1);
     nav.append(prev, el('span', null, `${i + 1} of ${n} here`), next);
