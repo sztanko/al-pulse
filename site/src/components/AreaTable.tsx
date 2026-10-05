@@ -22,7 +22,8 @@ export interface Row {
   inhabitants_per_al: number | null;
   al_per_1000: number | null;
   rank_within_country: number | null;
-  al_count_growth_pcnt: number | null;
+  /** Growth over the last twelve months. */
+  al_count_growth_12m_pcnt: number | null;
   rank_within_country_change: number | null;
   /** Defaults to true. False for Azorean areas, whose register records no
    * dates: growth, rank and rank movement do not exist for them, and the
@@ -49,7 +50,7 @@ type ColKind = 'text' | 'bar' | 'delta' | 'rankdelta' | 'scale';
 const COLUMNS: { key: Key; label: Parameters<typeof t>[1]; kind: ColKind }[] = [
   { key: 'name', label: 'table.area', kind: 'text' },
   { key: 'al_count', label: 'table.al_count', kind: 'bar' },
-  { key: 'al_count_growth_pcnt', label: 'table.growth', kind: 'delta' },
+  { key: 'al_count_growth_12m_pcnt', label: 'table.growth', kind: 'delta' },
   { key: 'inhabitants_per_al', label: 'table.inhabitants', kind: 'scale' },
   { key: 'rank_within_country', label: 'table.rank', kind: 'bar' },
   { key: 'rank_within_country_change', label: 'table.rank_change', kind: 'rankdelta' },
@@ -163,7 +164,7 @@ export default function AreaTable({ lang, rows, base, caption, initial = 25 }: P
             {shown.map((r) => {
               const timed = r.in_time_series !== false;
               const g = timed
-                ? f.delta(r.al_count_growth_pcnt)
+                ? f.delta(r.al_count_growth_12m_pcnt)
                 : { text: NOT_APPLICABLE, dir: 'na' as const };
               const rc = timed
                 ? f.rankDelta(r.rank_within_country_change)

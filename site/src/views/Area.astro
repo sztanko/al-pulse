@@ -53,6 +53,9 @@ const threeBack = Math.max(0, last - 36);
 const total = hasSeries ? (S.cum_c[last] ?? 0) : (a.al_count ?? 0);
 const totalThen = S.cum_c[threeBack] ?? 0;
 const growth3y = hasSeries && totalThen ? total / totalThen - 1 : null;
+const yearBack = Math.max(0, last - 12);
+const totalYearBack = S.cum_c[yearBack] ?? 0;
+const growth12m = hasSeries && totalYearBack ? total / totalYearBack - 1 : null;
 
 const alk = S.al_per_1000[last] ?? 0;
 const alkThen = S.al_per_1000[threeBack] ?? 0;
@@ -93,7 +96,7 @@ const toRow = (x: AreaRow) => ({
   inhabitants_per_al: x.inhabitants_per_al,
   al_per_1000: x.al_per_1000,
   rank_within_country: x.rank_within_country,
-  al_count_growth_pcnt: x.al_count_growth_pcnt,
+  al_count_growth_12m_pcnt: x.al_count_growth_12m_pcnt,
   rank_within_country_change: x.rank_within_country_change,
   in_time_series: x.in_time_series,
 });
@@ -178,6 +181,7 @@ const shrinking = hasSeries && pk.index < last && offPeak < -0.005;
           value={f.num0(total)}
           change={growth3y}
           changeLabel={t(lang, 'area.over_three')}
+          moreChanges={[{ change: growth12m, label: t(lang, 'area.over_twelve') }]}
         />
         <Metric
           lang={lang}

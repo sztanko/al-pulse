@@ -16,17 +16,24 @@ interface Props {
   /** Rank movement — inverted, because ranks improve downward. */
   rank?: number | null;
   changeLabel?: string;
+  /** Further raw changes over other periods, each on its own line under the
+   * first — e.g. twelve months as well as three years. */
+  moreChanges?: { change: number | null; label: string }[];
   note?: string;
   /** Small ranked-position line, e.g. "5th of 19". */
   context?: string;
 }
 
-const { lang, title, value, change, rank, changeLabel, note, context } = Astro.props;
+const { lang, title, value, change, rank, changeLabel, moreChanges = [], note, context } =
+  Astro.props;
 const f = fmt(lang);
 
 let d: { text: string; dir: Direction } | null = null;
 if (rank !== undefined && rank !== null) d = f.rankDelta(rank);
 else if (change !== undefined && change !== null) d = f.delta(change);
+const more = moreChanges
+  .filter((m) => m.change !== null)
+  .map((m) => ({ ...f.delta(m.change), label: m.label }));
 ---
 
 <div class="metric">
@@ -40,6 +47,14 @@ else if (change !== undefined && change !== null) d = f.delta(change);
         {changeLabel && <span class="metric-delta-label">{changeLabel}</span>}
       </div>
     )
+  }
+  {
+    more.map((m) => (
+      <div class:list={['metric-delta', `dir-${m.dir}`]}>
+        <span class="num">{m.text}</span>
+        <span class="metric-delta-label">{m.label}</span>
+      </div>
+    ))
   }
   {note && <div class="metric-note">{note}</div>}
 </div>

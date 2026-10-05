@@ -9,7 +9,7 @@ import TimeSeries from '../components/TimeSeries.tsx';
 import AreaTable from '../components/AreaTable.tsx';
 import {
   meta, country, areasOfType, lostSummary, observedPeak,
-  lossStartIndex, unobservedIndices, lossSpans,
+  lossStartIndex, unobservedIndices, lossSpans, gapRuns,
 } from '../lib/data';
 import { fmt } from '../lib/format';
 import { langBase, t, type Lang } from '../lib/i18n';
@@ -38,6 +38,9 @@ const lost = lostSummary(c.series);
 const threeYearsAgo = Math.max(0, last - 36);
 const totalThen = c.series.cum_c[threeYearsAgo] ?? 0;
 const growth3y = totalThen ? total / totalThen - 1 : null;
+const yearAgo = Math.max(0, last - 12);
+const totalYearAgo = c.series.cum_c[yearAgo] ?? 0;
+const growth12m = totalYearAgo ? total / totalYearAgo - 1 : null;
 
 // The peak is taken over *observed* months only. Between two pulls the series
 // is an interpolation, and its local maximum is an artefact of when we looked
@@ -61,7 +64,7 @@ const regionRows = regions.map((r) => ({
   inhabitants_per_al: r.inhabitants_per_al,
   al_per_1000: r.al_per_1000,
   rank_within_country: r.rank_within_country,
-  al_count_growth_pcnt: r.al_count_growth_pcnt,
+  al_count_growth_12m_pcnt: r.al_count_growth_12m_pcnt,
   rank_within_country_change: r.rank_within_country_change,
   in_time_series: r.in_time_series,
 }));
@@ -118,6 +121,7 @@ const lastMonth = f.monthLabel(m.data_through);
           value={f.num0(total)}
           change={growth3y}
           changeLabel={t(lang, 'home.m_over_three')}
+          moreChanges={[{ change: growth12m, label: t(lang, 'home.m_over_twelve') }]}
           note={t(lang, 'home.m_registered_note')}
         />
         {/* Shown as its own figure rather than folded into the total. Adding
@@ -197,16 +201,21 @@ const lastMonth = f.monthLabel(m.data_through);
   <p>
     {t(lang, 'home.p_flow_losses', { from: f.monthLabel(m.loss_observable_from) })}
     {
-      m.unobserved_months.length > 0 && (
+      gapRuns().map((g) => (
         <>
           {' '}
-          {t(lang, 'home.p_gap', {
-            from: f.monthLabel(m.unobserved_months[0]!),
-            to: f.monthLabel(m.unobserved_months[m.unobserved_months.length - 1]!),
-            at: lastMonth,
-          })}
+          {g.months === 1
+            ? t(lang, 'home.p_gap_one', {
+                month: f.monthLabel(g.from),
+                at: g.filedUnder ? f.monthLabel(g.filedUnder) : '—',
+              })
+            : t(lang, 'home.p_gap', {
+                from: f.monthLabel(g.from),
+                to: f.monthLabel(g.to),
+                at: g.filedUnder ? f.monthLabel(g.filedUnder) : '—',
+              })}
         </>
-      )
+      ))
     }
   </p>
   <figure>
@@ -230,7 +239,7 @@ const lastMonth = f.monthLabel(m.data_through);
       {t(lang, 'chart.read_hint')}{' '}
       {
         t(lang, 'home.cap_pulls', {
-          n: f.num0(m.observed_months.length),
+          n: f.num0(m.pulls.length),
           first: f.monthLabel(m.observed_months[0]!),
         })
       }

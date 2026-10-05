@@ -57,6 +57,11 @@ vars:
   # once keeps those four in agreement.
   azores_region_osm_id: 1629146
 
+  # A pull made on or before this day of the month closes the *previous* month
+  # (the timer runs on the 2nd; older manual pulls ran as late as the 7th).
+  # Losses it finds are filed under that month. See models/marts/al_pulls.sql.
+  pull_closes_previous_month_through_day: 7
+
   metrics:
     c: normal
     al_per_1000: normal

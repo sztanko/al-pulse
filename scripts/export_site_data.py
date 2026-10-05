@@ -118,6 +118,7 @@ def fetch_area_rows(con: duckdb.DuckDBPyConnection) -> list[dict]:
             s.al_per_1000               AS al_per_1000,
             s.rank_within_country       AS rank_within_country,
             s.al_count_growth_pcnt      AS al_count_growth_pcnt,
+            s.al_count_growth_12m_pcnt  AS al_count_growth_12m_pcnt,
             s.rank_within_country_change AS rank_within_country_change,
             s.direct_parent_slug        AS direct_parent_slug,
             s.ancestor_municipality_slug AS ancestor_municipality_slug,
@@ -200,12 +201,28 @@ def fetch_observed_months(con: duckdb.DuckDBPyConnection) -> list[str]:
     Without this the loss chart draws a flat zero from 2012 to 2025, asserting
     that no registration ever lapsed in thirteen years, and then a cliff in the
     month we happened to look. "Zero" and "not observed" are different facts.
+
+    A pull observes the month it *closes*, not the month it ran in: the pull on
+    2 October is September's (see models/marts/al_pulls.sql). Losses are filed
+    the same way, so the two must come from the same column.
     """
     rows = con.execute(
-        "SELECT DISTINCT strftime(etl_timestamp, '%Y-%m') AS m "
-        "FROM al_raw_data ORDER BY 1"
+        "SELECT DISTINCT closes_month AS m FROM al_pulls ORDER BY 1"
     ).fetchall()
     return [r[0] for r in rows]
+
+
+def fetch_pulls(con: duckdb.DuckDBPyConnection) -> list[dict]:
+    """Every pull of the register: the day it ran and the month it closes.
+
+    Not the same thing as the observed months. Two pulls can close one month
+    (16 September and 2 October 2026 both close September), so counting months
+    undercounts pulls, and listing months hides that a pull ran on the 2nd.
+    """
+    return rows_as_dicts(con, """
+        SELECT strftime(pulled_on, '%Y-%m-%d') AS date, closes_month AS closes
+        FROM al_pulls ORDER BY etl_timestamp
+        """)
 
 
 def fetch_events(con: duckdb.DuckDBPyConnection) -> list[dict]:
@@ -302,19 +319,23 @@ def build_meta(
     axis: list[str],
     areas: list[dict],
     observed: list[str],
+    pulls: list[dict],
     azores_total: int,
     azores_in_rnal: int,
 ) -> dict:
-    # Losses become detectable one month after the first snapshot, and stay
-    # detectable only where consecutive snapshots bracket the month.
+    # Losses become detectable at the second pull, and are filed under the
+    # month that pull closes — which is the first pull's own month when the
+    # second ran in the first days of the next one (25 May and 7 June 2025 both
+    # close May). They stay detectable only where consecutive pulls bracket
+    # the month.
     obs = set(observed)
-    loss_from = ""
-    if len(observed) >= 2:
-        i = axis.index(observed[0]) + 1 if observed[0] in axis else 0
-        loss_from = axis[i] if i < len(axis) else ""
+    loss_from = pulls[1]["closes"] if len(pulls) >= 2 else ""
+    # Only up to the last observed month: the months after it are not a gap,
+    # they are the ones the next pull has not closed yet.
+    last_obs = observed[-1] if observed else ""
     unobserved = [
         m for m in axis
-        if loss_from and m >= loss_from and m not in obs
+        if loss_from and loss_from <= m <= last_obs and m not in obs
     ]
 
     # How long each loss figure actually covers.
@@ -324,7 +345,7 @@ def build_meta(
     # "everything since the pull before it". While the register is pulled every
     # month that is one month and nobody need think about it. The register was
     # not pulled between March and September 2026, so September's figure covers
-    # six months — drawn in one month's width it is a cliff six times taller
+    # seven months (the 7 March pull closed February) — drawn in one month's width it is a cliff six times taller
     # than anything around it, and it reads as a catastrophic September rather
     # than as half a year of ordinary attrition.
     #
@@ -350,6 +371,7 @@ def build_meta(
         # there is "not observed", not zero.
         "unobserved_months": unobserved,
         "loss_spans": spans,
+        "pulls": pulls,
         "generated": date.today().isoformat(),
         "data_through": axis[-1],
         "counts": {
@@ -478,6 +500,7 @@ def main(
     rooms = fetch_rooms(con)
     map_rows = fetch_map_features(con)
     observed = fetch_observed_months(con)
+    pulls = fetch_pulls(con)
     azores_total, azores_in_rnal = fetch_azores_counts(con)
 
     by_id = {int(a["id"]): a for a in areas}
@@ -496,7 +519,7 @@ def main(
     total = 0
     total += write_json(
         out / "meta.json",
-        build_meta(axis, areas, observed, azores_total, azores_in_rnal),
+        build_meta(axis, areas, observed, pulls, azores_total, azores_in_rnal),
     )
     total += write_json(
         out / "country.json",
