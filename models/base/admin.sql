@@ -28,9 +28,13 @@ with_parents AS (
         parent.name AS parent_name,
         parent.admin_level AS parent_level
     FROM admin_areas AS child
+    -- A point inside the child, not the whole child: OSM boundaries do not
+    -- always nest exactly, and a freguesia whose edge strays a few metres past
+    -- its municipality's (Sesimbra (Castelo)) used to get the *region* as its
+    -- parent, so everything placed in it lost its municipality and was dropped.
     LEFT JOIN admin_areas AS parent
         ON
-            st_contains(parent.geom, child.geom)
+            st_contains(parent.geom, st_pointonsurface(child.geom))
             AND child.admin_level > parent.admin_level
 ),
 

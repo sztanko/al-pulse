@@ -71,8 +71,8 @@ const DICT = {
 
   // ------------------------------------------------------------------ footer
   'footer.source': entry({
-    en: 'Data through {month} from the Registo Nacional de Turismo, and for the Azores from the Região Autónoma dos Açores’ own register.',
-    pt: 'Dados até {month} do Registo Nacional de Turismo e, para os Açores, do registo da própria Região Autónoma dos Açores.',
+    en: 'Data through {month} from the Registo Nacional de Turismo, and for the Azores from the Região Autónoma dos Açores’ own register. Addresses located with INE’s Base Nacional de Moradas (CC BY 4.0).',
+    pt: 'Dados até {month} do Registo Nacional de Turismo e, para os Açores, do registo da própria Região Autónoma dos Açores. Moradas localizadas com a Base Nacional de Moradas do INE (CC BY 4.0).',
   }),
   'footer.counts': entry({
     en: '{localities} localities, {municipalities} municipalities, {regions} districts and autonomous regions.',

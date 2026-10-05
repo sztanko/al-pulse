@@ -87,6 +87,10 @@ data_points AS (
             cast(house_type = 'Moradia' AS INTEGER) AS is_moradia,
             cast(house_type = 'Apartamento' AS INTEGER) AS is_apartamento
         FROM base
+        -- A registration placed only to a municipality, or not at all, counts
+        -- at the levels it reached and nowhere below them. Without this it
+        -- would form an area with a NULL id.
+        WHERE base.{{ p[0] }} IS NOT NULL AND base.{{ p[1] }} IS NOT NULL
         {% if not loop.last -%}UNION ALL{%- endif -%}
     {%- endfor -%}
 ),

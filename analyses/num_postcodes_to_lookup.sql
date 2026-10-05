@@ -1,1 +1,0 @@
-select count(1) from {{ ref('postcodes_to_lookup')}}

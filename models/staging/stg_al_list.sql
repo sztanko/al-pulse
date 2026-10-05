@@ -80,7 +80,9 @@ capitalized AS (
         capitalize(parish) AS parish,
         regexp_replace(capitalize(municipality), '(.*)\s+\(.*\)', '\1', 'g') AS municipality,
         CASE
-            WHEN capitalize(district) = 'Ilha Da Madeira' THEN 'Madeira'
+            -- Porto Santo is Madeira; it used to fall into the 'Ilha D%' rule
+            -- below and be called Azorean.
+            WHEN capitalize(district) IN ('Ilha Da Madeira', 'Ilha De Porto Santo') THEN 'Madeira'
             WHEN capitalize(district) LIKE 'Ilha D%' THEN 'Açores'
             ELSE capitalize(district)
         END AS district,

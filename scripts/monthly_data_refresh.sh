@@ -37,6 +37,16 @@ else
 fi
 echo ""
 
+# Step 1b: Geocode new and changed registrations into the committed cache.
+echo "Geocoding new and changed registrations..."
+if python scripts/geocode_al.py; then
+    echo "✓ Geocoded"
+else
+    echo "✗ Geocoding failed"
+    exit 1
+fi
+echo ""
+
 # Step 2: Run ETL
 echo "Step 2/4: Running ETL pipeline..."
 if ./scripts/run_etl.sh; then
@@ -53,7 +63,7 @@ git add downloads/al/*.csv.gz
 # The Azorean pull, and its cleansing report. The raw pull beside them is
 # gitignored: it still holds the operator's name, e-mail and phone number.
 git add downloads/azores/*.csv.gz downloads/azores/*.report.json
-git add downloads/postal_code/
+git add downloads/geocode/
 
 # Check if there are changes to commit
 if git diff --staged --quiet; then

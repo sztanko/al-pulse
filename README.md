@@ -31,7 +31,7 @@ The project covers mainland Portugal and Madeira from the national register (RNA
 
 - **AL Listings**: [Turismo de Portugal RNT](https://rnt.turismodeportugal.pt/RNT/Pesquisa_AL.aspx)
 - **Administrative Boundaries**: [OpenStreetMap](https://download.geofabrik.de/europe/portugal-latest.osm.pbf)
-- **Postal Codes**: [CP7 Portugal](https://github.com/temospena/CP7)
+- **Addresses**: [INE Base Nacional de Moradas](https://dados.gov.pt/en/datasets/base-nacional-de-moradas/) (CC BY 4.0, Instituto Nacional de Estatística, I.P.), via [OpenAddresses](https://openaddresses.io), used to geocode registrations
 - **Census Data**: [INE Portugal](https://www.ine.pt/)
 
 All raw data is stored in compressed CSV format in the repository and processed through DBT models to create structured datasets.
@@ -117,7 +117,7 @@ Create a recurring monthly calendar event on the 1st to run `./scripts/monthly_d
 ├── data/                      # DuckDB database (not committed)
 ├── downloads/                 # Raw data (CSV.gz files, committed)
 │   ├── al/                   # AL listing data
-│   ├── postal_code/          # Postal code data
+│   ├── geocode/              # Geocode cache: a point per registration (input only, never published)
 │   └── osm/                  # OSM boundaries
 ├── models/                    # DBT models
 │   ├── staging/              # Initial data cleaning

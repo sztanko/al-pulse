@@ -20,6 +20,11 @@ const f = fmt('pt');
 const { monthLabel, num0, dateShort } = f;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const gaps = gapRuns();
+const P = m.placement;
+const G = P.by_geocode;
+const B = P.by_placement;
+const share = (v: number | undefined) =>
+  `${(((v ?? 0) / Math.max(1, P.total)) * 100).toFixed(0)}%`;
 ---
 
 <Base
@@ -177,14 +182,43 @@ const gaps = gapRuns();
     escrito em disco, e um teste faz falhar a construção se reaparecerem.
   </p>
 
+  <h2>Como são situados os registos nacionais</h2>
+  <p>
+    O registo nacional indica uma morada e um código postal, mas nenhuma
+    coordenada. Cada registo é geocodificado com a
+    {' '}<a href="https://dados.gov.pt/pt/datasets/base-nacional-de-moradas/">Base Nacional de Moradas</a>
+    {' '}do INE, cerca de seis milhões de pontos de morada, e a regra que deu
+    origem ao ponto fica guardada com ele. Dos {num0(P.total)} registos que
+    constam agora do registo:
+  </p>
+  <ul>
+    <li>{share(G.address)} coincidem com a porta — mesmo código postal, rua e número;</li>
+    <li>{share((G.street ?? 0) + (G.street_cp4 ?? 0))} coincidem com a rua, sem o número;</li>
+    <li>{share(G.postcode)} apenas com o código postal, no centro das suas moradas;</li>
+    <li>{share((G.postcode_area ?? 0) + (G.none ?? 0))} com uma zona postal inteira, ou com nada.</li>
+  </ul>
+  <p>
+    Um registo é colocado numa freguesia pelo seu ponto quando este é bom até
+    cerca de um quilómetro ou melhor e, caso contrário, pela localidade que o
+    registo indica. O ponto vem primeiro porque os nomes de freguesia do próprio
+    registo são muitas vezes os anteriores a 2013, ou abreviados ao ponto de
+    não coincidirem. As moradas do INE foram atualizadas pela última vez em
+    2019, pelo que as ruas mais recentes recorrem ao código postal.
+  </p>
+  <p>
+    Os pontos servem apenas para escolher uma área. Nada neste site mostra onde
+    fica um registo concreto: muitos são casas de pessoas, e cada número aqui é
+    uma contagem para uma área.
+  </p>
+
   <h2>O que fica de fora</h2>
   <ul>
     <li>
-      <strong>Áreas que a geografia não consegue situar.</strong> Um registo
-      cujo código postal não corresponde a nenhuma freguesia conhecida é contado
-      a nível nacional mas não aparece em nenhuma área. Os dados de referência
-      dos códigos postais são uma fotografia fixa, pelo que códigos emitidos
-      depois disso não resolvem.
+      <strong>Nada, por falta de localização.</strong> Um registo que só se
+      consegue associar ao seu concelho — {num0(B.municipality ?? 0)} agora —
+      conta aí e a nível nacional, mas em nenhuma freguesia; um que não
+      corresponde a nada — {num0(B.unplaced ?? 0)} — conta apenas a nível
+      nacional.
     </li>
   </ul>
 
@@ -198,8 +232,8 @@ const gaps = gapRuns();
   <h2>Problemas conhecidos em aberto</h2>
   <ul>
     <li>
-      Cerca de 800 registos assentam em códigos postais ausentes dos dados de
-      referência e, por isso, não são colocados no mapa.
+      Os registos em ruas mais recentes do que as moradas do INE de 2019 são
+      situados pelo código postal, que no campo pode ter quilómetros.
     </li>
     <li>
       As perdas num mês não observado são atribuídas à recolha seguinte, como
