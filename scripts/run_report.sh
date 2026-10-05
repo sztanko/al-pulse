@@ -34,6 +34,12 @@ python scripts/export_area_art.py
 echo "Exporting site payloads..."
 python scripts/export_site_data.py
 
+echo "Building the Madeira map..."
+# A standalone map, deliberately linked from no page, served at
+# /al-pulse/madeira-map/: each Madeiran property's point and register record,
+# with nothing about its operator. Astro copies site/public into dist as-is.
+python scripts/build_madeira_map.py --out-dir site/public/madeira-map
+
 echo "Building site..."
 # `npm run build` runs the theme-parity and type gates before astro build.
 npm --prefix site run build

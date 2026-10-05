@@ -1,0 +1,253 @@
+<!doctype html>
+<!--
+  Standalone map of every geocoded AL in Madeira, built by
+  scripts/build_madeira_map.py and deployed at /al-pulse/madeira-map/, linked
+  from no page. Property data only: nothing about the operator.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Alojamento Local · Madeira</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --surface: #fcfcfb;
+    --ink: #1f1f1d;
+    --ink-soft: #5c5b55;
+    --ink-faint: #8a897f;
+    --rule: #e4e3dc;
+    --on: #2a78d6;      /* categorical slot 1 — on the register */
+    --off: #eb6834;     /* categorical slot 2 — no longer on it  */
+    --radius: 10px;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  html, body, #map { margin: 0; height: 100%; }
+  body { color: var(--ink); background: var(--surface); }
+
+  .panel {
+    position: absolute; top: 12px; left: 12px; z-index: 2;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--rule); border-radius: var(--radius);
+    padding: 12px 14px 10px; width: 250px;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.08);
+  }
+  .panel h1 { font-size: 15px; margin: 0 0 2px; font-weight: 650; letter-spacing: -0.01em; }
+  .panel .sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 10px; }
+  .panel fieldset { border: 0; padding: 0; margin: 0 0 8px; }
+  .panel legend { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+                  color: var(--ink-faint); margin-bottom: 4px; }
+  .panel label { display: flex; align-items: center; gap: 8px; font-size: 13px;
+                 padding: 3px 0; cursor: pointer; }
+  .panel label .n { margin-left: auto; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .panel input { margin: 0; accent-color: var(--ink-soft); }
+  .sw { width: 12px; height: 12px; border-radius: 50%; flex: none; box-sizing: border-box; }
+  .sw.on { background: var(--on); } .sw.off { background: var(--off); }
+  .sw.solid { background: var(--ink-soft); } .sw.ring { border: 2px solid var(--ink-soft); }
+  .panel .note { font-size: 11px; color: var(--ink-faint); margin: 6px 0 0; line-height: 1.4; }
+
+  .maplibregl-popup-content {
+    padding: 0; border-radius: var(--radius); box-shadow: 0 8px 28px rgb(0 0 0 / 0.16);
+    font-size: 12.5px; color: var(--ink);
+  }
+  .pop { width: 300px; max-height: min(60vh, 460px); overflow: auto; }
+  .pop header { position: sticky; top: 0; background: var(--surface); padding: 10px 34px 8px 12px;
+                border-bottom: 1px solid var(--rule); }
+  .pop h2 { font-size: 14px; margin: 0; font-weight: 650; line-height: 1.25; }
+  .pop .badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;
+                font-size: 11.5px; color: var(--ink-soft); }
+  .pop .nav { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px;
+              color: var(--ink-soft); }
+  .pop .nav button { border: 1px solid var(--rule); background: var(--surface); border-radius: 6px;
+                     padding: 1px 8px; cursor: pointer; font: inherit; color: var(--ink); }
+  .pop .nav button:disabled { opacity: 0.4; cursor: default; }
+  .pop section { padding: 8px 12px 4px; }
+  .pop h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--ink-faint); margin: 0 0 4px; font-weight: 600; }
+  .pop dl { display: grid; grid-template-columns: 112px 1fr; gap: 3px 10px; margin: 0 0 6px; }
+  .pop dt { color: var(--ink-soft); }
+  .pop dd { margin: 0; overflow-wrap: anywhere; }
+  .maplibregl-popup-close-button { font-size: 18px; padding: 4px 10px; z-index: 1; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel" role="region" aria-label="Map key and filters">
+  <h1>Alojamento Local · Madeira</h1>
+  <p class="sub"><span id="shown">…</span> of <span id="total">…</span> registrations shown</p>
+  <fieldset>
+    <legend>Register</legend>
+    <label><input type="checkbox" data-f="on" checked><span class="sw on"></span>On the register<span class="n" id="n-on"></span></label>
+    <label><input type="checkbox" data-f="off" checked><span class="sw off"></span>No longer on it<span class="n" id="n-off"></span></label>
+  </fieldset>
+  <fieldset>
+    <legend>Location</legend>
+    <label><input type="checkbox" data-f="precise" checked><span class="sw solid"></span>Door or street<span class="n" id="n-precise"></span></label>
+    <label><input type="checkbox" data-f="approx" checked><span class="sw ring"></span>Postcode only<span class="n" id="n-approx"></span></label>
+  </fieldset>
+  <p class="note">A ring is the middle of a postcode, not the property. Click a point for the property's register record.</p>
+</div>
+
+<script>
+const ON = getComputedStyle(document.documentElement).getPropertyValue('--on').trim();
+const OFF = getComputedStyle(document.documentElement).getPropertyValue('--off').trim();
+const SURFACE = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
+
+// Madeira and Porto Santo, with room to pan.
+const BOUNDS = [[-17.35, 32.55], [-16.2, 33.15]];
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/positron',
+  bounds: BOUNDS,
+  fitBoundsOptions: { padding: { top: 40, bottom: 40, left: 280, right: 40 } },
+  maxBounds: [[-18.2, 32.2], [-15.6, 33.5]],
+  attributionControl: false,
+});
+map.addControl(new maplibregl.AttributionControl({
+  compact: true,
+  customAttribution: 'Addresses: INE Base Nacional de Moradas (CC BY 4.0) · Register: RNT',
+}));
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+const details = fetch('details.json').then((r) => r.json());
+
+// Size follows zoom: specks over the whole island, a clickable dot at street
+// level. Exponential so the step from island to town is gentle.
+const RADIUS = ['interpolate', ['exponential', 1.6], ['zoom'],
+  8, 1.4, 10, 2.2, 12, 3.4, 14, 5.5, 16, 8.5, 18, 12];
+const COLOUR = ['case', ['get', 'active'], ON, OFF];
+
+const filters = { on: true, off: true, precise: true, approx: true };
+function statusFilter() {
+  const keep = [];
+  if (filters.on) keep.push(true);
+  if (filters.off) keep.push(false);
+  return ['in', ['get', 'active'], ['literal', keep]];
+}
+
+map.on('load', async () => {
+  const points = await fetch('points.geojson').then((r) => r.json());
+  map.addSource('al', { type: 'geojson', data: points });
+
+  // Rings under dots: an approximate point never hides an exact one.
+  map.addLayer({
+    id: 'approx', type: 'circle', source: 'al',
+    filter: ['all', ['!', ['get', 'precise']], statusFilter()],
+    paint: {
+      'circle-radius': RADIUS,
+      'circle-color': SURFACE,
+      'circle-opacity': 0.55,
+      'circle-stroke-color': COLOUR,
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 14, 1.6, 18, 2.2],
+      'circle-stroke-opacity': 0.9,
+    },
+  });
+  map.addLayer({
+    id: 'precise', type: 'circle', source: 'al',
+    filter: ['all', ['get', 'precise'], statusFilter()],
+    paint: {
+      'circle-radius': RADIUS,
+      'circle-color': COLOUR,
+      'circle-opacity': 0.9,
+      // A thin surface ring keeps overlapping dots countable.
+      'circle-stroke-color': SURFACE,
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 0.3, 14, 1, 18, 1.5],
+    },
+  });
+
+  const feats = points.features.map((f) => f.properties);
+  const count = (p) => feats.filter(p).length;
+  const set = (id, n) => (document.getElementById(id).textContent = n.toLocaleString('en-GB'));
+  set('total', feats.length);
+  set('n-on', count((p) => p.active));
+  set('n-off', count((p) => !p.active));
+  set('n-precise', count((p) => p.precise));
+  set('n-approx', count((p) => !p.precise));
+  const refreshShown = () => set('shown', count((p) =>
+    (p.active ? filters.on : filters.off) && (p.precise ? filters.precise : filters.approx)));
+  refreshShown();
+
+  document.querySelectorAll('.panel input').forEach((el) => el.addEventListener('change', () => {
+    filters[el.dataset.f] = el.checked;
+    map.setFilter('precise', ['all', ['get', 'precise'], statusFilter()]);
+    map.setFilter('approx', ['all', ['!', ['get', 'precise']], statusFilter()]);
+    map.setLayoutProperty('precise', 'visibility', filters.precise ? 'visible' : 'none');
+    map.setLayoutProperty('approx', 'visibility', filters.approx ? 'visible' : 'none');
+    refreshShown();
+  }));
+
+  for (const layer of ['precise', 'approx']) {
+    map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
+    map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
+  }
+
+  // A click takes everything under a small box around the pointer, not just
+  // the top feature: many registrations share one building, or one postcode
+  // centre, and a popup showing one of them would hide the rest.
+  map.on('click', async (e) => {
+    const pad = 6;
+    const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
+    const hits = map.queryRenderedFeatures(box, { layers: ['precise', 'approx'] });
+    const ids = [...new Set(hits.map((h) => h.properties.id))];
+    if (!ids.length) return;
+    const all = await details;
+    const at = hits[0].geometry.coordinates;
+    const popup = new maplibregl.Popup({ maxWidth: 'none', offset: 10 }).setLngLat(at);
+    let i = 0;
+    const render = () => popup.setDOMContent(card(all[ids[i]], i, ids.length, (d) => {
+      i = (i + d + ids.length) % ids.length;
+      render();
+    }));
+    render();
+    popup.addTo(map);
+  });
+});
+
+// Built with textContent throughout: every value comes from a public register
+// and is rendered as text, never as markup.
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function card(d, i, n, step) {
+  const root = el('div', 'pop');
+  const head = el('header');
+  head.append(el('h2', null, d.title));
+  const badge = el('div', 'badge');
+  const sw = el('span', 'sw ' + (d.active ? 'on' : 'off'));
+  badge.append(sw, document.createTextNode(d.active ? 'On the register' : 'No longer on the register'));
+  head.append(badge);
+  if (n > 1) {
+    const nav = el('div', 'nav');
+    const prev = el('button', null, '‹');
+    const next = el('button', null, '›');
+    prev.setAttribute('aria-label', 'Previous registration here');
+    next.setAttribute('aria-label', 'Next registration here');
+    prev.onclick = () => step(-1);
+    next.onclick = () => step(1);
+    nav.append(prev, el('span', null, `${i + 1} of ${n} here`), next);
+    head.append(nav);
+  }
+  root.append(head);
+  for (const [title, rows] of d.sections) {
+    if (!rows.length) continue;
+    const s = el('section');
+    s.append(el('h3', null, title));
+    const dl = el('dl');
+    for (const [k, v] of rows) dl.append(el('dt', null, k), el('dd', null, String(v)));
+    s.append(dl);
+    root.append(s);
+  }
+  return root;
+}
+</script>
+</body>
+</html>

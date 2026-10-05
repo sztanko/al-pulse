@@ -37,3 +37,8 @@ site/public/geo/
 # The address file the geocoder reads (~600 MB). Fetched on first use; only
 # its output, downloads/geocode/al_geocoded.csv.gz, is committed.
 data/bnm/
+
+# The Madeira map (scripts/build_madeira_map.py) is generated, never committed:
+# run_report.sh builds it into site/public/madeira-map on every deploy.
+data/madeira_map/
+site/public/madeira-map/
