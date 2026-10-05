@@ -184,8 +184,10 @@ const share = (v: number | undefined) =>
   </ul>
   <p>
     A registration is put in a freguesia by its point when that point is good
-    to about a kilometre or better, and otherwise by the locality the register
-    names. The point comes first because the register's own freguesia names are
+    to about a kilometre or better and lies in the municipality the register
+    names, and otherwise by the locality the register names. INE's file has a
+    small share of misplaced points — the same door stored twice, kilometres
+    apart — so points far from the rest of their postcode are discarded first. The point comes first because the register's own freguesia names are
     often the pre-2013 ones or abbreviated past matching. INE's addresses were
     last updated in 2019, so streets built since then fall back to the postcode.
   </p>

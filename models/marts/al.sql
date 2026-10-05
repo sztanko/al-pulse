@@ -9,6 +9,7 @@
 SELECT
     al.*,
     p.placement_method,
+    p.point_rejected,
     p.locality_name,
     p.locality_osm_id,
     p.municipality_name,

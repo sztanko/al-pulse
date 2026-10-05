@@ -107,6 +107,10 @@ def fetch_rows(con: duckdb.DuckDBPyConnection) -> list[dict]:
         WHERE al.region_name = ?
           AND al.geom IS NOT NULL
           AND al.geocode_method <> 'none'
+          -- A point outside the municipality the register names is the
+          -- geocoder's mistake (al_placement); drawing it would put the
+          -- property somewhere it is not.
+          AND NOT al.point_rejected
         ORDER BY al.al_id
     """
     cur = con.execute(sql, [MADEIRA_REGION])

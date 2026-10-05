@@ -199,8 +199,11 @@ const share = (v: number | undefined) =>
   </ul>
   <p>
     Um registo é colocado numa freguesia pelo seu ponto quando este é bom até
-    cerca de um quilómetro ou melhor e, caso contrário, pela localidade que o
-    registo indica. O ponto vem primeiro porque os nomes de freguesia do próprio
+    cerca de um quilómetro ou melhor e fica no concelho que o registo indica e,
+    caso contrário, pela localidade que o registo indica. O ficheiro do INE tem
+    uma pequena parte de pontos mal colocados — a mesma porta guardada duas
+    vezes, a quilómetros de distância — pelo que os pontos afastados do resto
+    do seu código postal são descartados primeiro. O ponto vem primeiro porque os nomes de freguesia do próprio
     registo são muitas vezes os anteriores a 2013, ou abreviados ao ponto de
     não coincidirem. As moradas do INE foram atualizadas pela última vez em
     2019, pelo que as ruas mais recentes recorrem ao código postal.
