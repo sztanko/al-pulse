@@ -54,7 +54,7 @@ regional_monthly AS (
 latest AS (
     SELECT *
     FROM regional_monthly
-    WHERE month_date = DATE_TRUNC('month', CURRENT_DATE)
+    WHERE month_date = {{ latest_month() }}
 ),
 
 -- Two look-backs, because they answer different questions: three years is the
@@ -67,7 +67,7 @@ prev_12_months AS (
         ancestor_region_slug,
         al_count AS al_count_12_months_ago
     FROM regional_monthly
-    WHERE month_date = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 month'
+    WHERE month_date = {{ latest_month() }} - INTERVAL '12 month'
 ),
 
 prev_year AS (
@@ -80,7 +80,7 @@ prev_year AS (
         al_count AS al_count_prev_year,
         rank_within_country AS rank_prev_year
     FROM regional_monthly
-    WHERE month_date = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '3 year'
+    WHERE month_date = {{ latest_month() }} - INTERVAL '3 year'
 ),
 
 national AS (

@@ -21,7 +21,7 @@ SELECT
 FROM {{ ref('admin_stats') }} AS s
 JOIN {{ ref('admin') }} AS a ON a.osm_id = s.area_id
 JOIN {{ ref('admin_stats') }} AS s_old ON s.area_id = s_old.area_id 
-    AND s_old.year_month = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '3 years')
+    AND s_old.year_month = {{ latest_month() }} - INTERVAL '3 years'
 JOIN {{ ref('admin_stats') }} AS s_2015 ON s.area_id = s_2015.area_id 
     AND s_2015.year_month = '2015-01-01'
-WHERE s.year_month = DATE_TRUNC('month', CURRENT_DATE)
+WHERE s.year_month = {{ latest_month() }}
