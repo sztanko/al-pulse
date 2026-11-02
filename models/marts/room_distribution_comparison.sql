@@ -19,7 +19,7 @@ WITH latest_room_stats AS (
         END AS metric_description
     FROM {{ ref('region_stats_per_metric') }}
     WHERE
-        year_month = date_trunc('month', current_date)
+        year_month = {{ latest_month() }}
         AND metric_name IN ('rooms_0', 'rooms_1', 'rooms_2', 'rooms_3', 'rooms_more_than_3')
         AND context_area_type = 'country'
 ),

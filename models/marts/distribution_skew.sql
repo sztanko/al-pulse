@@ -14,7 +14,7 @@ base_stats AS (
         a.population
     FROM {{ ref('region_stats') }} AS r
     LEFT JOIN {{ ref('admin') }} AS a ON r.area_id = a.osm_id
-    WHERE year_month = date_trunc('month', current_date - interval '1 month')
+    WHERE year_month = {{ latest_month() }} - INTERVAL '1 month'
 ),
 
 top_admin AS (

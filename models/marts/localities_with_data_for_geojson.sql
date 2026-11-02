@@ -23,7 +23,7 @@ WITH national AS (
     INNER JOIN {{ ref('region_stats') }} AS stats
         ON
             a.osm_id = stats.area_id
-            AND stats.year_month = date_trunc('month', current_date)
+            AND stats.year_month = {{ latest_month() }}
     WHERE
         a.admin_type = 'locality'
         AND a.osm_id IS NOT NULL
