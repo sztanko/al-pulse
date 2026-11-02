@@ -19,7 +19,11 @@ WITH base AS (
         -- region_name AS region,
         0 AS country
     FROM {{ ref('al') }}
-    -- Removed WHERE is_active = true to count ALL registrations
+    -- ALL registrations, current and lost, but only through the month the
+    -- latest pull closes: a registration dated 1 November, seen by the
+    -- 2 November pull, belongs to a month the data does not cover yet. It is
+    -- counted once the next pull closes November.
+    WHERE strftime(registration_date, '%Y-%m') <= strftime({{ data_through_month() }}, '%Y-%m')
 ),
 
 {% set area_groups = [
@@ -133,9 +137,13 @@ distinct_areas AS (
     LEFT JOIN {{ ref('admin') }} AS a ON gd.area_id = a.osm_id
 ),
 
+-- Every month with a registration, plus the month the data runs through
+-- even if nothing was registered in it, so "now" always has a row.
 distinct_year_months AS (
     SELECT DISTINCT year_month
     FROM grouped_data
+    UNION
+    SELECT strftime({{ data_through_month() }}, '%Y-%m')
 ),
 
 all_rows AS (
